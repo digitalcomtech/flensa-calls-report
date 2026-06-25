@@ -12,6 +12,7 @@ const packageJsonPath = path.join(
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
 
 const DEV_SESSION_SECRET = 'dev-secret-change-in-production';
+const DEFAULT_PEGASUS_API_URL = 'https://api.pegasusgateway.com';
 
 function optional(name, fallback = '') {
   return process.env[name] ?? fallback;
@@ -31,10 +32,9 @@ export const env = {
   sessionSecret: optional('SESSION_SECRET', DEV_SESSION_SECRET),
   useMockReport: bool('USE_MOCK_REPORT', true),
   pegasus: {
-    apiUrl: optional('PEGASUS_API_URL', ''),
-    clientId: optional('PEGASUS_CLIENT_ID'),
-    clientSecret: optional('PEGASUS_CLIENT_SECRET'),
-    redirectUri: optional('PEGASUS_REDIRECT_URI', 'http://localhost:3001/api/auth/callback'),
+    apiUrl: optional('PEGASUS_API_URL', DEFAULT_PEGASUS_API_URL),
+    authMode: optional('PEGASUS_AUTH_MODE', 'iframe'),
+    allowedParentOrigin: optional('PEGASUS_ALLOWED_PARENT_ORIGIN', ''),
   },
   twilio: {
     accountSid: optional('TWILIO_ACCOUNT_SID'),
@@ -46,8 +46,8 @@ export function isProduction() {
   return (process.env.NODE_ENV ?? env.nodeEnv) === 'production';
 }
 
-export function isPegasusConfigured() {
-  return Boolean(env.pegasus.apiUrl && env.pegasus.clientId && env.pegasus.clientSecret);
+export function isPegasusApiConfigured() {
+  return Boolean(env.pegasus.apiUrl);
 }
 
 export function isTwilioConfigured() {
@@ -69,9 +69,10 @@ export function getEnvDiagnostics() {
   return {
     app: env.appName,
     nodeEnv: process.env.NODE_ENV ?? env.nodeEnv,
+    authMode: env.pegasus.authMode,
     useMockReport: env.useMockReport,
     allowDevSession: isDevSessionAllowed(),
-    pegasusConfigured: isPegasusConfigured(),
+    pegasusApiConfigured: isPegasusApiConfigured(),
     twilioConfigured: isTwilioConfigured(),
   };
 }
@@ -91,9 +92,25 @@ export function validateEnvOnStartup() {
 }
 
 export function cookieOptions() {
+  const iframeMode = env.pegasus.authMode === 'iframe';
   return {
     httpOnly: true,
-    sameSite: 'lax',
     secure: isProduction(),
+    sameSite: isProduction() && iframeMode ? 'none' : 'lax',
   };
+}
+
+export function getPegasusTokenFromUser(user) {
+  if (!user || typeof user !== 'object') {
+    return null;
+  }
+  return user.pegasusToken ?? user.accessToken ?? null;
+}
+
+export function sanitizeUserForClient(user) {
+  if (!user || typeof user !== 'object') {
+    return null;
+  }
+  const { pegasusToken, accessToken, isDevSession, ...safeUser } = user;
+  return safeUser;
 }

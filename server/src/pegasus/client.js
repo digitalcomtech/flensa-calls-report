@@ -14,6 +14,13 @@ function buildUrl(path) {
   return `${base}${normalizedPath}`;
 }
 
+function pegasusHeaders(token) {
+  return {
+    Authenticate: token,
+    Accept: 'application/json',
+  };
+}
+
 /**
  * Authenticated Pegasus GET. Never logs the token.
  */
@@ -29,10 +36,7 @@ export async function pegasusGet(path, { token }) {
   try {
     response = await fetch(buildUrl(path), {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
+      headers: pegasusHeaders(token),
     });
   } catch {
     throw new PegasusApiError(503, 'Pegasus API is unreachable');

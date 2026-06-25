@@ -3,9 +3,11 @@ services:
     name: flensa-calls-report-qa
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /healthz
+    previews:
+      generation: automatic
     envVars:
       - key: NODE_ENV
         value: production
@@ -13,15 +15,13 @@ services:
         value: "true"
       - key: ALLOW_DEV_SESSION
         value: "false"
+      - key: PEGASUS_AUTH_MODE
+        value: iframe
+      - key: PEGASUS_API_URL
+        value: https://api.pegasusgateway.com
       - key: SESSION_SECRET
         generateValue: true
       - key: CLIENT_URL
         sync: false
-      - key: PEGASUS_API_URL
-        sync: false
-      - key: PEGASUS_CLIENT_ID
-        sync: false
-      - key: PEGASUS_CLIENT_SECRET
-        sync: false
-      - key: PEGASUS_REDIRECT_URI
+      - key: PEGASUS_ALLOWED_PARENT_ORIGIN
         sync: false

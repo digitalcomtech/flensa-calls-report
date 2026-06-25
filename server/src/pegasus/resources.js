@@ -58,10 +58,10 @@ function extractTriggerIds(resources) {
 }
 
 /**
- * Fetch and normalize GET /api/user/resources for the authenticated user.
+ * Fetch and normalize GET /user/resources for the authenticated Pegasus user.
  */
 export async function listUserResources({ token }) {
-  const payload = await pegasusGet('/api/user/resources', { token });
+  const payload = await pegasusGet('/user/resources', { token });
   const resources = normalizeResourceArray(payload);
   const triggerIds = extractTriggerIds(resources);
   const warnings = [];

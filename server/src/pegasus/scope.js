@@ -1,4 +1,4 @@
-import { isDevSessionAllowed } from '../env.js';
+import { getPegasusTokenFromUser, isDevSessionAllowed } from '../env.js';
 import { listUserResources } from './resources.js';
 import {
   collectTriggersFromResources,
@@ -92,14 +92,15 @@ export async function resolveUserScope(user) {
     return emptyScope({ warnings: ['dev session is not allowed'] });
   }
 
-  const hasPegasusToken = Boolean(user.accessToken);
+  const pegasusToken = getPegasusTokenFromUser(user);
+  const hasPegasusToken = Boolean(pegasusToken);
   if (!hasPegasusToken) {
     return emptyScope({ warnings: ['missing pegasus token'] });
   }
 
   let resourceResult;
   try {
-    resourceResult = await listUserResources({ token: user.accessToken });
+    resourceResult = await listUserResources({ token: pegasusToken });
   } catch {
     return emptyScope({
       hasPegasusToken: true,
@@ -108,7 +109,7 @@ export async function resolveUserScope(user) {
   }
 
   const triggers = await fetchTriggersForResources({
-    token: user.accessToken,
+    token: pegasusToken,
     resources: resourceResult.resources,
     triggerIds: resourceResult.triggerIds,
   });

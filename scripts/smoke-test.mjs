@@ -69,7 +69,7 @@ async function run() {
     assert(health.ok === true, '/healthz returns ok');
     assert(health.diagnostics?.useMockReport === true, 'diagnostics report mock mode');
     assert(typeof health.diagnostics?.app === 'string', 'healthz includes app name');
-    assert(typeof health.diagnostics?.pegasusConfigured === 'boolean', 'pegasusConfigured is boolean');
+    assert(typeof health.diagnostics?.pegasusApiConfigured === 'boolean', 'pegasusApiConfigured is boolean');
     assert(typeof health.diagnostics?.twilioConfigured === 'boolean', 'twilioConfigured is boolean');
 
     const unauthorizedReport = await fetch(`${BASE}/api/reports/calls?from=2026-06-20&to=2026-06-23`);

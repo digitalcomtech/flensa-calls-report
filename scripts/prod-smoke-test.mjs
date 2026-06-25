@@ -74,7 +74,8 @@ async function run() {
     assert(typeof health.diagnostics?.app === 'string', 'healthz includes app name');
     assert(health.diagnostics?.useMockReport === true, 'healthz reports mock mode');
     assert(health.diagnostics?.allowDevSession === false, 'healthz reports dev session disabled in production');
-    assert(typeof health.diagnostics?.pegasusConfigured === 'boolean', 'pegasusConfigured is boolean');
+    assert(health.diagnostics?.authMode === 'iframe', 'healthz reports iframe auth mode');
+    assert(typeof health.diagnostics?.pegasusApiConfigured === 'boolean', 'pegasusApiConfigured is boolean');
     assert(typeof health.diagnostics?.twilioConfigured === 'boolean', 'twilioConfigured is boolean');
     assert(!('sessionSecret' in (health.diagnostics ?? {})), 'healthz does not expose session secret');
 

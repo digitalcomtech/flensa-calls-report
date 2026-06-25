@@ -1,4 +1,4 @@
-import { loginUrl, logout } from '../api/client.js';
+import { logout } from '../api/authClient.js';
 
 export default function Header({ user }) {
   return (
@@ -14,9 +14,7 @@ export default function Header({ user }) {
               </button>
             </>
           ) : (
-            <a className="button" href={loginUrl()}>
-              Log in with Pegasus
-            </a>
+            <span className="user-name">Not signed in</span>
           )}
         </div>
       </div>

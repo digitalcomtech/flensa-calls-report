@@ -23,6 +23,17 @@ export function logout() {
   return request('/auth/logout', { method: 'POST' });
 }
 
-export function loginUrl() {
-  return `${API_BASE}/auth/login`;
+export function getIframeConfig() {
+  return request('/auth/iframe-config');
+}
+
+export function exchangeIframeToken(token) {
+  return request('/auth/iframe', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
+export function createDevSession() {
+  return request('/auth/dev-session', { method: 'POST' });
 }

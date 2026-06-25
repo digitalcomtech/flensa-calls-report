@@ -19,7 +19,7 @@ describe('production safety', () => {
     }
   });
 
-  it('health diagnostics expose booleans only for integration flags', () => {
+  it('health diagnostics expose safe iframe auth fields only', () => {
     const previousNodeEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'development';
 
@@ -27,12 +27,14 @@ describe('production safety', () => {
       const diagnostics = getEnvDiagnostics();
 
       assert.equal(typeof diagnostics.app, 'string');
+      assert.equal(diagnostics.authMode, 'iframe');
       assert.equal(typeof diagnostics.useMockReport, 'boolean');
       assert.equal(typeof diagnostics.allowDevSession, 'boolean');
-      assert.equal(typeof diagnostics.pegasusConfigured, 'boolean');
+      assert.equal(typeof diagnostics.pegasusApiConfigured, 'boolean');
       assert.equal(typeof diagnostics.twilioConfigured, 'boolean');
       assert.ok(!('sessionSecret' in diagnostics));
-      assert.ok(!('accessToken' in diagnostics));
+      assert.ok(!('pegasusToken' in diagnostics));
+      assert.ok(!('allowedParentOrigin' in diagnostics));
     } finally {
       process.env.NODE_ENV = previousNodeEnv;
     }

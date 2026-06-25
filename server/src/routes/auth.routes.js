@@ -1,50 +1,49 @@
 import { Router } from 'express';
-import { cookieOptions, env, isDevSessionAllowed, isPegasusConfigured, isProduction } from '../env.js';
+import { validatePegasusToken } from '../auth/pegasusIframeAuth.js';
 import {
-  createOAuthState,
-  exchangeCodeForTokens,
-  fetchUserProfile,
-  getAuthorizationUrl,
-  STATE_COOKIE,
-} from '../auth/pegasusAuth.js';
+  getPegasusTokenFromUser,
+  isDevSessionAllowed,
+  isPegasusApiConfigured,
+  isProduction,
+  sanitizeUserForClient,
+} from '../env.js';
 
 const router = Router();
 
-router.get('/login', (req, res) => {
-  if (!isPegasusConfigured()) {
-    return res.status(503).json({ error: 'Pegasus authentication is not configured' });
-  }
-
-  const state = createOAuthState();
-  res.cookie(STATE_COOKIE, state, { ...cookieOptions(), maxAge: 10 * 60 * 1000 });
-  res.redirect(getAuthorizationUrl(state));
+router.get('/iframe-config', (_req, res) => {
+  res.json({
+    authMode: 'iframe',
+    allowedParentOrigin: process.env.PEGASUS_ALLOWED_PARENT_ORIGIN ?? '',
+  });
 });
 
-router.get('/callback', async (req, res) => {
+router.post('/iframe', async (req, res) => {
+  const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+
+  if (!token) {
+    return res.status(400).json({ error: 'Token is required' });
+  }
+
+  if (!isPegasusApiConfigured()) {
+    return res.status(503).json({ error: 'Pegasus API is not configured' });
+  }
+
   try {
-    const { code, state } = req.query;
-    const savedState = req.cookies?.[STATE_COOKIE];
-
-    if (!code || !state || state !== savedState) {
-      return res.status(400).json({ error: 'Invalid OAuth callback' });
-    }
-
-    res.clearCookie(STATE_COOKIE);
-
-    const tokens = await exchangeCodeForTokens(code);
-    const profile = await fetchUserProfile(tokens.access_token);
+    const profile = await validatePegasusToken(token);
 
     req.session.user = {
-      id: profile.id ?? profile.sub,
-      name: profile.name ?? profile.email,
-      email: profile.email,
-      accessToken: tokens.access_token,
+      ...profile,
+      pegasusToken: token,
     };
 
-    res.redirect(env.clientUrl);
+    res.json({
+      ok: true,
+      user: sanitizeUserForClient(req.session.user),
+    });
   } catch {
-    res.status(500).json({
-      error: isProduction() ? 'Authentication failed' : 'OAuth callback failed',
+    console.error('Iframe auth validation failed');
+    res.status(401).json({
+      error: isProduction() ? 'Authentication failed' : 'Invalid Pegasus token',
     });
   }
 });
@@ -61,7 +60,10 @@ router.post('/dev-session', (req, res) => {
     isDevSession: true,
   };
 
-  res.json({ ok: true, user: { id: 'dev-user', name: 'Dev User', email: 'dev@example.com' } });
+  res.json({
+    ok: true,
+    user: sanitizeUserForClient(req.session.user),
+  });
 });
 
 router.get('/me', (req, res) => {
@@ -69,8 +71,7 @@ router.get('/me', (req, res) => {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  const { accessToken, ...user } = req.session.user;
-  res.json({ user });
+  res.json({ user: sanitizeUserForClient(req.session.user) });
 });
 
 router.post('/logout', (req, res) => {
