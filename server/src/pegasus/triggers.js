@@ -164,6 +164,16 @@ export function collectTriggersFromResources(resources) {
       continue;
     }
 
+    if (
+      Array.isArray(resource.processes) ||
+      Array.isArray(resource.process) ||
+      (resource.process && typeof resource.process === 'object') ||
+      Array.isArray(resource.config?.processes)
+    ) {
+      triggers.push(resource);
+      continue;
+    }
+
     if (resource.trigger && typeof resource.trigger === 'object') {
       triggers.push(resource.trigger);
     }

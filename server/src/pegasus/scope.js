@@ -129,5 +129,6 @@ export async function resolveUserScope(user) {
     destinationCount: extracted.destinationCount,
     destinations: extracted.destinations,
     warnings,
+    resourceShape: resourceResult.shape,
   };
 }

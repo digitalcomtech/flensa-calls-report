@@ -19,6 +19,7 @@ router.get('/scope', requireAuth, async (req, res) => {
         mode: env.useMockReport ? 'mock' : 'live',
         authMode: env.pegasus.authMode,
         hasSession: true,
+        includeResourceShape: true,
       })
     );
   } catch {

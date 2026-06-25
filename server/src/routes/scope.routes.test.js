@@ -82,6 +82,7 @@ describe('/api/report/scope diagnostics gate', () => {
       assert.ok(!('pegasusToken' in body));
       assert.ok(!('resources' in body));
       assert.ok(!('triggers' in body));
+      assert.ok(!('resourcesRawType' in body));
     } finally {
       process.env.ENABLE_SCOPE_DIAGNOSTICS = previous;
     }

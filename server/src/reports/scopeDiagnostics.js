@@ -2,8 +2,8 @@ import { maskDestinations } from '../utils/phoneMask.js';
 
 const FULL_PHONE_PATTERN = /\+?\d{7,}/;
 
-export function buildSafeScopeDiagnostics(scope, { mode, authMode, hasSession }) {
-  return {
+export function buildSafeScopeDiagnostics(scope, { mode, authMode, hasSession, includeResourceShape = false }) {
+  const diagnostics = {
     mode,
     authMode,
     hasSession,
@@ -14,6 +14,17 @@ export function buildSafeScopeDiagnostics(scope, { mode, authMode, hasSession })
     destinationsPreview: maskDestinations(scope.destinations ?? []),
     warnings: [...(scope.warnings ?? [])],
   };
+
+  if (includeResourceShape && scope.resourceShape) {
+    diagnostics.resourcesRawType = scope.resourceShape.resourcesRawType;
+    diagnostics.resourcesTopLevelKeys = [...(scope.resourceShape.resourcesTopLevelKeys ?? [])];
+    diagnostics.candidateArrayPaths = (scope.resourceShape.candidateArrayPaths ?? []).map((entry) => ({
+      path: entry.path,
+      count: entry.count,
+    }));
+  }
+
+  return diagnostics;
 }
 
 export function buildSafeReportScopeMeta(scope, matchedMockRows) {
