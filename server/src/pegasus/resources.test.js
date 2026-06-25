@@ -137,14 +137,101 @@ describe('normalizeResourcesFromPayload', () => {
     const result = normalizeResourcesFromPayload(PEGASUS194_FIXTURE);
 
     assert.equal(result.rawCount, 4);
+    assert.equal(result.resources.length, 4);
     assert.equal(result.triggers.length, 1);
     assert.equal(result.triggers[0].id, 4);
     assert.equal(result.triggers[0].resourceType, 'trigger');
+    assert.ok(!result.triggers[0].type || result.triggers[0].type === 'trigger');
     assert.ok(!result.warnings.includes('resources response shape unrecognized or empty'));
     assert.equal(extractTwilioDestinations(result.triggers).triggerCount, 1);
     assert.equal(result.shape.resourcesRawType, 'object');
+    assert.equal(result.normalization.normalizedResourceCount, 4);
+    assert.equal(result.normalization.normalizedTriggerCount, 1);
     assert.ok(result.shape.resourcesTopLevelKeys.includes('triggers'));
     assert.ok(result.shape.candidateArrayPaths.some((entry) => entry.path === 'triggers' && entry.count === 1));
+  });
+
+  it('normalizes pegasus194 top-level arrays with primitive trigger ids', () => {
+    const result = normalizeResourcesFromPayload({
+      username: 'redacted',
+      assets: ['asset-1', 'asset-2'],
+      tasks: ['task-1'],
+      vehicles: ['vehicle-1'],
+      triggers: ['trigger-1', 'trigger-2'],
+    });
+
+    assert.equal(result.rawCount, 6);
+    assert.equal(result.normalization.normalizedResourceCount, 6);
+    assert.equal(result.normalization.normalizedTriggerCount, 2);
+    assert.equal(result.triggers.length, 2);
+    assert.equal(result.triggers[0].id, 'trigger-1');
+    assert.equal(result.triggers[0].resourceType, 'trigger');
+    assert.equal(containsFullPhoneNumber(result), false);
+  });
+
+  it('reports hosted-scale counts and trigger diagnostics sample size', async () => {
+    const { buildTriggerDiagnostics } = await import('./triggerDiagnostics.js');
+
+    const hostedShape = {
+      username: 'redacted',
+      assets: Array.from({ length: 204 }, () => ({ id: 'a' })),
+      tasks: Array.from({ length: 88 }, () => ({ id: 't' })),
+      vehicles: Array.from({ length: 3791 }, () => ({ id: 'v' })),
+      triggers: Array.from({ length: 483 }, () => ({ id: 'tr', processes: [] })),
+    };
+
+    const result = normalizeResourcesFromPayload(hostedShape);
+    const triggerDiagnostics = buildTriggerDiagnostics(result.triggers);
+
+    assert.equal(result.normalization.rawTopLevelArrayCounts.triggers, 483);
+    assert.equal(result.normalization.normalizedResourceCount, 4566);
+    assert.equal(result.normalization.normalizedTriggerCount, 483);
+    assert.equal(result.rawCount, 4566);
+    assert.equal(result.triggers.length, 483);
+    assert.equal(triggerDiagnostics.sampledTriggerCount, 25);
+    assert.ok(!result.warnings.includes('resources response shape unrecognized or empty'));
+    assert.equal(containsFullPhoneNumber(result.shape), false);
+    assert.ok(!('assets' in result.shape));
+  });
+});
+
+describe('scope diagnostics normalization fields', () => {
+  it('includes normalized counts without leaking raw payload', async () => {
+    const { buildSafeScopeDiagnostics } = await import('../reports/scopeDiagnostics.js');
+    const { buildTriggerDiagnostics } = await import('./triggerDiagnostics.js');
+    const result = normalizeResourcesFromPayload(PEGASUS194_FIXTURE);
+
+    const diagnostics = buildSafeScopeDiagnostics(
+      {
+        resourceCount: result.rawCount,
+        triggerCount: result.triggers.length,
+        destinationCount: 0,
+        destinations: [],
+        warnings: result.warnings,
+        resourceShape: result.shape,
+        normalization: result.normalization,
+        triggerDiagnostics: buildTriggerDiagnostics(result.triggers),
+      },
+      {
+        mode: 'mock',
+        authMode: 'iframe',
+        hasSession: true,
+        includeResourceShape: true,
+        includeTriggerDiagnostics: true,
+      }
+    );
+
+    assert.equal(diagnostics.normalizedResourceCount, 4);
+    assert.equal(diagnostics.normalizedTriggerCount, 1);
+    assert.deepEqual(diagnostics.rawTopLevelArrayCounts, {
+      assets: 1,
+      tasks: 1,
+      vehicles: 1,
+      triggers: 1,
+    });
+    assert.equal(diagnostics.triggerDiagnostics.sampledTriggerCount, 1);
+    assert.equal(containsFullPhoneNumber(diagnostics), false);
+    assert.ok(!('assets' in diagnostics));
   });
 });
 

@@ -25,6 +25,25 @@ export function buildSafeScopeDiagnostics(
       path: entry.path,
       count: entry.count,
     }));
+    diagnostics.normalizedResourceCount =
+      scope.normalization?.normalizedResourceCount ??
+      scope.resourceShape.normalizedResourceCount ??
+      scope.resourceCount ??
+      0;
+    diagnostics.normalizedTriggerCount =
+      scope.normalization?.normalizedTriggerCount ??
+      scope.resourceShape.normalizedTriggerCount ??
+      scope.triggerCount ??
+      0;
+    diagnostics.rawTopLevelArrayCounts = {
+      ...(scope.normalization?.rawTopLevelArrayCounts ??
+        scope.resourceShape.rawTopLevelArrayCounts ?? {
+          assets: 0,
+          tasks: 0,
+          vehicles: 0,
+          triggers: 0,
+        }),
+    };
   }
 
   if (includeTriggerDiagnostics && scope.triggerDiagnostics) {

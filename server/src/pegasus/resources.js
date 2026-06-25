@@ -132,6 +132,51 @@ function annotateResourceType(item, resourceType) {
   return annotated;
 }
 
+export function normalizeResourceItem(item, resourceType) {
+  if (isPlainObject(item)) {
+    return annotateResourceType(item, resourceType);
+  }
+
+  if (typeof item === 'string' || typeof item === 'number') {
+    const id = String(item).trim();
+    if (!id) {
+      return null;
+    }
+
+    return {
+      id,
+      resourceType,
+      type: resourceType,
+    };
+  }
+
+  return null;
+}
+
+export function getRawTopLevelArrayCounts(payload) {
+  const counts = {
+    assets: 0,
+    tasks: 0,
+    vehicles: 0,
+    triggers: 0,
+  };
+
+  if (!isPlainObject(payload)) {
+    return counts;
+  }
+
+  for (const key of Object.keys(counts)) {
+    counts[key] = Array.isArray(payload[key]) ? payload[key].length : 0;
+  }
+
+  return counts;
+}
+
+function hasPegasus194TopLevelArrays(payload) {
+  const counts = getRawTopLevelArrayCounts(payload);
+  return Object.values(counts).some((count) => count > 0);
+}
+
 function isPegasusUserResourcesObject(payload) {
   if (!isPlainObject(payload)) {
     return false;
@@ -151,9 +196,9 @@ function flattenPegasusUserResourceObject(payload) {
     }
 
     for (const item of payload[key]) {
-      const annotated = annotateResourceType(item, resourceType);
-      if (annotated) {
-        resources.push(annotated);
+      const normalized = normalizeResourceItem(item, resourceType);
+      if (normalized) {
+        resources.push(normalized);
       }
     }
   }
@@ -161,14 +206,18 @@ function flattenPegasusUserResourceObject(payload) {
   return resources;
 }
 
-export function extractTopLevelTriggers(payload) {
+function extractTopLevelTriggersFromPayload(payload) {
   if (!Array.isArray(payload?.triggers)) {
     return [];
   }
 
   return payload.triggers
-    .map((item) => annotateResourceType(item, 'trigger'))
+    .map((item) => normalizeResourceItem(item, 'trigger'))
     .filter(Boolean);
+}
+
+export function extractTopLevelTriggers(payload) {
+  return extractTopLevelTriggersFromPayload(payload);
 }
 
 function dedupeResourceRecords(resources) {
@@ -244,9 +293,9 @@ function flattenTypeKeyedResourceMap(payload) {
   for (const { key, resourceType } of PEGASUS_USER_RESOURCE_ARRAYS) {
     if (Array.isArray(payload[key])) {
       for (const item of payload[key]) {
-        const annotated = annotateResourceType(item, resourceType);
-        if (annotated) {
-          collected.push(annotated);
+        const normalized = normalizeResourceItem(item, resourceType);
+        if (normalized) {
+          collected.push(normalized);
         }
       }
     }
@@ -311,16 +360,24 @@ function flattenIdKeyedResourceMap(payload) {
 
 function normalizeResourceArray(payload) {
   if (Array.isArray(payload)) {
-    return payload.filter((item) => isPlainObject(item));
+    return payload
+      .map((item) => normalizeResourceItem(item, 'resource'))
+      .filter(Boolean);
   }
 
   if (!isPlainObject(payload)) {
     return [];
   }
 
+  if (hasPegasus194TopLevelArrays(payload)) {
+    return flattenPegasusUserResourceObject(payload);
+  }
+
   for (const key of ['data', 'resources', 'items', 'results']) {
     if (Array.isArray(payload[key]) && payload[key].length > 0) {
-      return payload[key].filter((item) => isPlainObject(item));
+      return payload[key]
+        .map((item) => normalizeResourceItem(item, 'resource'))
+        .filter(Boolean);
     }
   }
 
@@ -394,10 +451,12 @@ function hasSupportedTopLevelResourceArrays(payload) {
   );
 }
 
-function buildResourceWarnings(payload, resources) {
+function buildResourceWarnings(payload, flattenedResources) {
   const warnings = [];
+  const rawCounts = getRawTopLevelArrayCounts(payload);
+  const hasTopLevelArrays = Object.values(rawCounts).some((count) => count > 0);
 
-  if (payload !== null && resources.length === 0 && !hasSupportedTopLevelResourceArrays(payload)) {
+  if (payload !== null && flattenedResources.length === 0 && !hasTopLevelArrays) {
     warnings.push('resources response shape unrecognized or empty');
   }
 
@@ -406,18 +465,56 @@ function buildResourceWarnings(payload, resources) {
 
 export function normalizeResourcesFromPayload(payload) {
   const shape = analyzeResourcesPayloadShape(payload);
-  const resources = dedupeResourceRecords(normalizeResourceArray(payload));
-  const triggers = extractTopLevelTriggers(payload);
-  const triggerIds = extractTriggerIds([...resources, ...triggers]);
-  const warnings = buildResourceWarnings(payload, resources);
+  const rawTopLevelArrayCounts = getRawTopLevelArrayCounts(payload);
+  const pegasusArraysPresent = hasPegasus194TopLevelArrays(payload);
+
+  const flattenedResources = pegasusArraysPresent && isPlainObject(payload)
+    ? flattenPegasusUserResourceObject(payload)
+    : normalizeResourceArray(payload);
+  const resources = dedupeResourceRecords(flattenedResources);
+
+  let triggers = [];
+  let usedTriggersFallback = false;
+
+  if (pegasusArraysPresent && isPlainObject(payload)) {
+    triggers = extractTopLevelTriggersFromPayload(payload);
+  } else {
+    triggers = extractTopLevelTriggers(payload);
+  }
+
+  if (
+    rawTopLevelArrayCounts.triggers > 0 &&
+    triggers.length === 0 &&
+    Array.isArray(payload?.triggers)
+  ) {
+    triggers = payload.triggers
+      .map((item) => normalizeResourceItem(item, 'trigger'))
+      .filter(Boolean);
+    usedTriggersFallback = triggers.length > 0;
+  }
+
+  const warnings = buildResourceWarnings(payload, flattenedResources);
+  if (usedTriggersFallback) {
+    warnings.push('used raw top-level triggers fallback');
+  }
+
+  const normalization = {
+    normalizedResourceCount: flattenedResources.length,
+    normalizedTriggerCount: triggers.length,
+    rawTopLevelArrayCounts,
+  };
 
   return {
-    rawCount: resources.length,
+    rawCount: normalization.normalizedResourceCount,
     resources,
     triggers,
-    triggerIds,
+    triggerIds: extractTriggerIds([...resources, ...triggers]),
     warnings,
-    shape,
+    shape: {
+      ...shape,
+      ...normalization,
+    },
+    normalization,
   };
 }
 

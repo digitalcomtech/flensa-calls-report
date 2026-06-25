@@ -121,6 +121,7 @@ export async function resolveUserScope(user) {
 
   const extracted = extractTwilioDestinations(triggers);
   const warnings = [...resourceResult.warnings];
+  const normalizedTriggerCount = resourceResult.triggers.length || triggers.length;
 
   if (resourceResult.triggers.length > 0 && extracted.destinationCount === 0) {
     warnings.push('no twilio/call destinations found in triggers');
@@ -132,11 +133,12 @@ export async function resolveUserScope(user) {
     hasPegasusToken: true,
     isDevSession: false,
     resourceCount: resourceResult.rawCount,
-    triggerCount: extracted.triggerCount,
+    triggerCount: normalizedTriggerCount,
     destinationCount: extracted.destinationCount,
     destinations: extracted.destinations,
     warnings,
     resourceShape: resourceResult.shape,
+    normalization: resourceResult.normalization,
     triggerDiagnostics: buildTriggerDiagnostics(triggers),
   };
 }
