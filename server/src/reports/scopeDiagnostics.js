@@ -73,7 +73,12 @@ export function buildSafeScopeDiagnostics(
         uniqueTriggerIdCount: scope.triggerHydration.uniqueTriggerIdCount ?? 0,
         hydratedTriggerCount: scope.triggerHydration.hydratedTriggerCount ?? 0,
         method: scope.triggerHydration.method ?? 'none',
+        endpointTried: scope.triggerHydration.endpointTried ?? null,
         httpStatus: scope.triggerHydration.httpStatus ?? null,
+        candidateStatuses: (scope.triggerHydration.candidateStatuses ?? []).map((entry) => ({
+          candidate: entry.candidate,
+          httpStatus: entry.httpStatus,
+        })),
         warnings: [...(scope.triggerHydration.warnings ?? [])],
       };
     }

@@ -6,6 +6,24 @@ export const HYDRATION_PAGE_SIZE = 500;
 export const HYDRATION_MAX_PAGES = 10;
 export const HYDRATION_BY_ID_CONCURRENCY = 10;
 
+export const LIST_ENDPOINT_CANDIDATES = [
+  { label: 'triggers-list-select', basePath: '/triggers', withSelect: true },
+  { label: 'triggers-list', basePath: '/triggers', withSelect: false },
+  { label: 'api-triggers-list-select', basePath: '/api/triggers', withSelect: true },
+  { label: 'api-triggers-list', basePath: '/api/triggers', withSelect: false },
+];
+
+const BY_ID_ENDPOINT_CANDIDATES = [
+  {
+    label: 'triggers-by-id',
+    paths: (id) => [`/triggers/${id}`, `/triggers?id=${id}`],
+  },
+  {
+    label: 'api-triggers-by-id',
+    paths: (id) => [`/api/triggers/${id}`, `/api/triggers?id=${id}`],
+  },
+];
+
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -118,6 +136,19 @@ export function shouldHydrateTriggerDetails(triggers, extracted) {
   return extractTriggerIdsFromRefs(triggers).length > 0;
 }
 
+function isIdKeyedTriggerMap(payload) {
+  if (!isPlainObject(payload)) {
+    return false;
+  }
+
+  const entries = Object.entries(payload);
+  if (entries.length === 0) {
+    return false;
+  }
+
+  return entries.every(([key, value]) => normalizeId(key) && isPlainObject(value));
+}
+
 export function normalizeTriggerListPayload(payload) {
   if (Array.isArray(payload)) {
     return payload.filter((item) => isPlainObject(item));
@@ -127,10 +158,14 @@ export function normalizeTriggerListPayload(payload) {
     return [];
   }
 
-  for (const key of ['data', 'triggers', 'items', 'results']) {
+  for (const key of ['data', 'results', 'items', 'triggers']) {
     if (Array.isArray(payload[key])) {
       return payload[key].filter((item) => isPlainObject(item));
     }
+  }
+
+  if (isIdKeyedTriggerMap(payload)) {
+    return Object.values(payload).filter((item) => isPlainObject(item));
   }
 
   if (isPlainObject(payload.trigger)) {
@@ -144,68 +179,134 @@ export function normalizeTriggerListPayload(payload) {
   return [];
 }
 
-function buildListPath({ page, set, select }) {
+function buildListPath(basePath, { page, set, withSelect }) {
   const params = new URLSearchParams();
-  if (page) {
-    params.set('page', String(page));
+  params.set('page', String(page));
+  params.set('set', String(set));
+  if (withSelect) {
+    params.set('select', 'id,name,processes,actions,config');
   }
-  if (set) {
-    params.set('set', String(set));
-  }
-  if (select) {
-    params.set('select', select);
-  }
-
-  const query = params.toString();
-  return query ? `/api/triggers?${query}` : '/api/triggers';
+  return `${basePath}?${params.toString()}`;
 }
 
-async function fetchTriggersListPage({ token, page, set, select, signal }) {
-  const path = buildListPath({ page, set, select });
-  const payload = await pegasusGet(path, { token, signal });
-  return normalizeTriggerListPayload(payload);
+async function tryPegasusGet(path, { token, signal }) {
+  try {
+    const payload = await pegasusGet(path, { token, signal });
+    return { httpStatus: 200, payload };
+  } catch (error) {
+    if (error instanceof PegasusApiError) {
+      return { httpStatus: error.status, payload: null };
+    }
+    throw error;
+  }
 }
 
-async function fetchTriggerById({ token, id, signal }) {
-  const encodedId = encodeURIComponent(id);
+function recordCandidateStatus(candidateStatuses, label, httpStatus) {
+  const existing = candidateStatuses.find((entry) => entry.candidate === label);
+  if (existing) {
+    if (existing.httpStatus !== 200 && httpStatus === 200) {
+      existing.httpStatus = httpStatus;
+    }
+    return;
+  }
 
-  for (const path of [`/api/triggers/${encodedId}`, `/api/triggers?id=${encodedId}`]) {
-    try {
-      const payload = await pegasusGet(path, { token, signal });
-      const triggers = normalizeTriggerListPayload(payload);
-      if (triggers.length > 0) {
-        return triggers[0];
-      }
-    } catch (error) {
-      if (!(error instanceof PegasusApiError)) {
-        throw error;
-      }
+  candidateStatuses.push({ candidate: label, httpStatus });
+}
+
+function mergeDetailedListItems(pageItems, idSet, hydratedById) {
+  let contributed = 0;
+
+  for (const trigger of pageItems) {
+    const id = extractTriggerIdFromRef(trigger);
+    if (!id || !idSet.has(id) || hydratedById.has(id) || isShallowTrigger(trigger)) {
+      continue;
+    }
+
+    hydratedById.set(id, trigger);
+    contributed += 1;
+  }
+
+  return contributed;
+}
+
+async function fetchTriggersListPage({ token, candidate, page, signal }) {
+  const path = buildListPath(candidate.basePath, {
+    page,
+    set: HYDRATION_PAGE_SIZE,
+    withSelect: candidate.withSelect,
+  });
+  const result = await tryPegasusGet(path, { token, signal });
+  return {
+    httpStatus: result.httpStatus,
+    items: result.httpStatus === 200 ? normalizeTriggerListPayload(result.payload) : [],
+  };
+}
+
+async function resolveListEndpoint({ token, signal, candidateStatuses }) {
+  for (const candidate of LIST_ENDPOINT_CANDIDATES) {
+    const { httpStatus, items } = await fetchTriggersListPage({
+      token,
+      candidate,
+      page: 1,
+      signal,
+    });
+    recordCandidateStatus(candidateStatuses, candidate.label, httpStatus);
+
+    if (httpStatus === 200) {
+      return { candidate, firstPageItems: items, httpStatus };
     }
   }
 
   return null;
 }
 
-async function fetchTriggersByIdBatch({ token, ids, signal }) {
+async function fetchTriggerById({ token, id, signal, candidateStatuses }) {
+  const encodedId = encodeURIComponent(id);
+
+  for (const candidate of BY_ID_ENDPOINT_CANDIDATES) {
+    for (const path of candidate.paths(encodedId)) {
+      const result = await tryPegasusGet(path, { token, signal });
+      recordCandidateStatus(candidateStatuses, candidate.label, result.httpStatus);
+
+      if (result.httpStatus !== 200) {
+        continue;
+      }
+
+      const triggers = normalizeTriggerListPayload(result.payload);
+      const trigger =
+        triggers.find((entry) => extractTriggerIdFromRef(entry) === id) ?? triggers[0] ?? null;
+
+      if (trigger && !isShallowTrigger(trigger)) {
+        return { trigger, endpointTried: candidate.label };
+      }
+    }
+  }
+
+  return { trigger: null, endpointTried: null };
+}
+
+async function fetchTriggersByIdBatch({ token, ids, signal, candidateStatuses }) {
   const hydratedById = new Map();
+  let endpointTried = null;
 
   for (let index = 0; index < ids.length; index += HYDRATION_BY_ID_CONCURRENCY) {
     const batch = ids.slice(index, index + HYDRATION_BY_ID_CONCURRENCY);
     const results = await Promise.all(
       batch.map(async (id) => {
-        const trigger = await fetchTriggerById({ token, id, signal });
-        return [id, trigger];
+        const result = await fetchTriggerById({ token, id, signal, candidateStatuses });
+        return [id, result.trigger, result.endpointTried];
       })
     );
 
-    for (const [id, trigger] of results) {
+    for (const [id, trigger, triedLabel] of results) {
       if (trigger) {
         hydratedById.set(id, trigger);
+        endpointTried = triedLabel ?? endpointTried;
       }
     }
   }
 
-  return hydratedById;
+  return { hydratedById, endpointTried };
 }
 
 function createEmptyDiagnostics({ attempted = false } = {}) {
@@ -215,7 +316,9 @@ function createEmptyDiagnostics({ attempted = false } = {}) {
     uniqueTriggerIdCount: 0,
     hydratedTriggerCount: 0,
     method: 'none',
+    endpointTried: null,
     httpStatus: null,
+    candidateStatuses: [],
     warnings: [],
   };
 }
@@ -243,85 +346,90 @@ export async function fetchTriggerDetails({ token, triggerRefs, limit = HYDRATIO
   const signal = controller.signal;
   const idSet = new Set(idsToFetch);
   const hydratedById = new Map();
-  let listHttpStatus = 200;
   let listContributedCount = 0;
   let byIdContributedCount = 0;
+  let listEndpointTried = null;
+  let byIdEndpointTried = null;
 
   try {
-    let page = 1;
-    while (page <= HYDRATION_MAX_PAGES && hydratedById.size < idsToFetch.length) {
-      let pageItems = [];
+    const listResolution = await resolveListEndpoint({
+      token,
+      signal,
+      candidateStatuses: diagnostics.candidateStatuses,
+    });
 
-      try {
-        pageItems = await fetchTriggersListPage({
+    if (listResolution) {
+      const { candidate, firstPageItems, httpStatus } = listResolution;
+      diagnostics.httpStatus = httpStatus;
+      listEndpointTried = candidate.label;
+      listContributedCount += mergeDetailedListItems(firstPageItems, idSet, hydratedById);
+
+      let previousPageSize = firstPageItems.length;
+      let page = 2;
+      while (
+        page <= HYDRATION_MAX_PAGES &&
+        hydratedById.size < idsToFetch.length &&
+        previousPageSize >= HYDRATION_PAGE_SIZE
+      ) {
+        const { httpStatus: pageStatus, items } = await fetchTriggersListPage({
           token,
+          candidate,
           page,
-          set: HYDRATION_PAGE_SIZE,
-          select: 'id,name,processes,actions,config',
           signal,
         });
-        listHttpStatus = 200;
-      } catch (error) {
-        if (page === 1) {
-          try {
-            pageItems = await fetchTriggersListPage({
-              token,
-              page: null,
-              set: null,
-              select: null,
-              signal,
-            });
-            listHttpStatus = 200;
-          } catch (fallbackError) {
-            listHttpStatus = fallbackError instanceof PegasusApiError ? fallbackError.status : null;
-            diagnostics.warnings.push('trigger list hydration request failed');
-            break;
-          }
-        } else {
+        recordCandidateStatus(diagnostics.candidateStatuses, candidate.label, pageStatus);
+
+        if (pageStatus !== 200 || items.length === 0) {
           break;
         }
-      }
 
-      if (pageItems.length === 0) {
-        break;
-      }
+        listContributedCount += mergeDetailedListItems(items, idSet, hydratedById);
+        previousPageSize = items.length;
 
-      for (const trigger of pageItems) {
-        const id = extractTriggerIdFromRef(trigger);
-        if (id && idSet.has(id) && !hydratedById.has(id)) {
-          hydratedById.set(id, trigger);
-          listContributedCount += 1;
+        if (items.length < HYDRATION_PAGE_SIZE) {
+          break;
         }
-      }
 
-      if (pageItems.length < HYDRATION_PAGE_SIZE) {
-        break;
+        page += 1;
       }
-
-      page += 1;
+    } else {
+      diagnostics.warnings.push('trigger list hydration request failed');
+      const lastStatus = diagnostics.candidateStatuses.at(-1)?.httpStatus ?? null;
+      diagnostics.httpStatus = lastStatus;
     }
 
     const missingIds = idsToFetch.filter((id) => !hydratedById.has(id));
     if (missingIds.length > 0) {
-      const byIdResults = await fetchTriggersByIdBatch({ token, ids: missingIds, signal });
-      for (const [id, trigger] of byIdResults.entries()) {
+      const byIdResults = await fetchTriggersByIdBatch({
+        token,
+        ids: missingIds,
+        signal,
+        candidateStatuses: diagnostics.candidateStatuses,
+      });
+
+      for (const [id, trigger] of byIdResults.hydratedById.entries()) {
         if (!hydratedById.has(id)) {
           hydratedById.set(id, trigger);
           byIdContributedCount += 1;
         }
       }
+
+      byIdEndpointTried = byIdResults.endpointTried;
     }
 
     const triggers = idsToFetch.map((id) => hydratedById.get(id)).filter(Boolean);
     diagnostics.hydratedTriggerCount = triggers.length;
-    diagnostics.httpStatus = listHttpStatus;
 
     if (listContributedCount > 0) {
       diagnostics.method = 'list';
+      diagnostics.endpointTried = listEndpointTried;
     } else if (byIdContributedCount > 0) {
       diagnostics.method = 'by-id';
+      diagnostics.endpointTried = byIdEndpointTried;
+      diagnostics.httpStatus = 200;
     } else {
       diagnostics.method = 'none';
+      diagnostics.endpointTried = null;
     }
 
     if (triggers.length === 0) {
@@ -331,6 +439,7 @@ export async function fetchTriggerDetails({ token, triggerRefs, limit = HYDRATIO
     return { triggers, diagnostics };
   } catch {
     diagnostics.method = 'none';
+    diagnostics.endpointTried = null;
     diagnostics.warnings.push('trigger detail hydration request failed');
     return { triggers: [], diagnostics };
   } finally {

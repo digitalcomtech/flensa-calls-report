@@ -144,7 +144,9 @@ describe('/api/report/scope diagnostics gate', () => {
             uniqueTriggerIdCount: 2,
             hydratedTriggerCount: 2,
             method: 'list',
+            endpointTried: 'triggers-list-select',
             httpStatus: 200,
+            candidateStatuses: [{ candidate: 'triggers-list-select', httpStatus: 200 }],
             warnings: [],
           },
         },
@@ -159,6 +161,10 @@ describe('/api/report/scope diagnostics gate', () => {
 
       assert.ok('triggerHydration' in diagnostics);
       assert.equal(diagnostics.triggerHydration.method, 'list');
+      assert.equal(diagnostics.triggerHydration.endpointTried, 'triggers-list-select');
+      assert.deepEqual(diagnostics.triggerHydration.candidateStatuses, [
+        { candidate: 'triggers-list-select', httpStatus: 200 },
+      ]);
       assert.equal(diagnostics.triggerHydration.hydratedTriggerCount, 2);
       assert.equal(containsFullPhoneNumber(diagnostics), false);
       assert.ok(!('pegasusToken' in diagnostics));

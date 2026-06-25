@@ -75,7 +75,7 @@ describe('resolveUserScope', () => {
         });
       }
 
-      if (target.includes('/api/triggers')) {
+      if (target.includes('/triggers?') && !target.includes('/api/triggers')) {
         return pegasusJsonResponse({
           data: [
             {
@@ -101,7 +101,7 @@ describe('resolveUserScope', () => {
 
       assert.equal(scope.destinationCount, 2);
       assert.ok(scope.warnings.includes('hydrated trigger details'));
-      assert.equal(scope.triggerHydration?.method, 'list');
+      assert.equal(scope.triggerHydration?.endpointTried, 'triggers-list-select');
       assert.equal(scope.triggerHydration?.hydratedTriggerCount, 2);
       assert.ok(scope.triggerDiagnostics.processArrayPaths.some((entry) => entry.path === 'processes' && entry.count > 0));
       assert.equal(containsFullPhoneNumber(scope.triggerDiagnostics), false);
@@ -149,7 +149,7 @@ describe('resolveUserScope', () => {
         });
       }
 
-      if (target.includes('/api/triggers')) {
+      if (target.includes('/triggers') || target.includes('/api/triggers')) {
         return new Response('forbidden', { status: 403 });
       }
 
