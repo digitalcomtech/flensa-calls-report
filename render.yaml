@@ -25,3 +25,5 @@ services:
         sync: false
       - key: PEGASUS_ALLOWED_PARENT_ORIGIN
         sync: false
+      - key: ENABLE_SCOPE_DIAGNOSTICS
+        value: "false"

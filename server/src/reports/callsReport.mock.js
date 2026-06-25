@@ -51,7 +51,7 @@ export function filterCallsByDestinations(calls, allowedDestinations) {
   return calls.filter((call) => allowed.has(call.destination));
 }
 
-export function buildMockCallsReport({ from, to, allowedDestinations = [], scopeMeta } = {}) {
+export function buildMockCallsReport({ from, to, allowedDestinations = [] } = {}) {
   const end = endOfDay(parseDate(to, new Date()));
   const start = parseDate(from, new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000));
   start.setHours(0, 0, 0, 0);
@@ -72,6 +72,5 @@ export function buildMockCallsReport({ from, to, allowedDestinations = [], scope
     summary: buildSummary(calls),
     calls,
     source: 'mock',
-    scope: scopeMeta ?? null,
   };
 }

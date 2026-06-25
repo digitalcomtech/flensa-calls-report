@@ -1,21 +1,22 @@
 import { env } from '../env.js';
 import { resolveUserScope } from '../pegasus/scope.js';
 import { buildMockCallsReport } from './callsReport.mock.js';
+import { buildSafeReportScopeMeta } from './scopeDiagnostics.js';
 
 export async function buildCallsReport({ from, to, user } = {}) {
   const scope = await resolveUserScope(user);
 
   if (env.useMockReport) {
-    return buildMockCallsReport({
+    const report = buildMockCallsReport({
       from,
       to,
       allowedDestinations: scope.destinations,
-      scopeMeta: {
-        destinationCount: scope.destinationCount,
-        isDevSession: scope.isDevSession,
-        hasPegasusToken: scope.hasPegasusToken,
-      },
     });
+
+    return {
+      ...report,
+      scope: buildSafeReportScopeMeta(scope, report.calls.length),
+    };
   }
 
   throw new Error(

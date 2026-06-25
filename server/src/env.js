@@ -31,6 +31,7 @@ export const env = {
   clientUrl: optional('CLIENT_URL', 'http://localhost:5173'),
   sessionSecret: optional('SESSION_SECRET', DEV_SESSION_SECRET),
   useMockReport: bool('USE_MOCK_REPORT', true),
+  enableScopeDiagnostics: bool('ENABLE_SCOPE_DIAGNOSTICS', false),
   pegasus: {
     apiUrl: optional('PEGASUS_API_URL', DEFAULT_PEGASUS_API_URL),
     authMode: optional('PEGASUS_AUTH_MODE', 'iframe'),
@@ -52,6 +53,12 @@ export function isPegasusApiConfigured() {
 
 export function isTwilioConfigured() {
   return Boolean(env.twilio.accountSid && env.twilio.authToken);
+}
+
+export function isScopeDiagnosticsEnabled() {
+  const raw = process.env.ENABLE_SCOPE_DIAGNOSTICS;
+  if (raw === undefined) return false;
+  return ['1', 'true', 'yes', 'on'].includes(raw.toLowerCase());
 }
 
 /** Dev sessions are never allowed in production, regardless of ALLOW_DEV_SESSION. */

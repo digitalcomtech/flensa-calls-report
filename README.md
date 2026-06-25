@@ -69,9 +69,27 @@ ALLOW_DEV_SESSION=true
 curl -X POST http://localhost:3001/api/auth/dev-session -c cookies.txt
 ```
 
-### Scope diagnostics (non-production only)
+### Scope diagnostics (hosted QA gate)
 
-`GET /api/report/scope` requires BFF session. Disabled in production.
+`GET /api/report/scope` requires BFF session and is **disabled by default**.
+
+Set `ENABLE_SCOPE_DIAGNOSTICS=true` on Render PR previews or QA services to inspect masked scope resolution:
+
+```json
+{
+  "mode": "mock",
+  "authMode": "iframe",
+  "hasSession": true,
+  "hasPegasusToken": true,
+  "resourceCount": 0,
+  "triggerCount": 0,
+  "destinationCount": 0,
+  "destinationsPreview": ["***5678"],
+  "warnings": []
+}
+```
+
+Never exposes tokens, raw Pegasus payloads, or full phone numbers. Disable before broader client-facing use.
 
 ## Scripts
 
@@ -92,12 +110,12 @@ curl -X POST http://localhost:3001/api/auth/dev-session -c cookies.txt
 | GET | `/api/auth/me` | Session | Current user (no token) |
 | POST | `/api/auth/logout` | Session | End session |
 | POST | `/api/auth/dev-session` | No* | Dev-only test session |
-| GET | `/api/report/scope` | Session** | Scoped destination diagnostics |
+| GET | `/api/report/scope` | Session* | Masked scope diagnostics (gated) |
 | GET | `/api/reports/calls` | Session | Scoped report JSON (`from`, `to`) |
 | GET | `/api/reports/calls/export` | Session | Scoped CSV export |
 
 \*Only when `ALLOW_DEV_SESSION=true` and not production.  
-\**Disabled in production.
+\*Requires `ENABLE_SCOPE_DIAGNOSTICS=true`; returns 404 when disabled.
 
 ## Scoping behavior
 
@@ -132,8 +150,33 @@ Deploy as a **single Web Service** (not Static Site). Use **PR Previews** for QA
 | `PEGASUS_AUTH_MODE` | `iframe` |
 | `PEGASUS_API_URL` | `https://api.pegasusgateway.com` |
 | `PEGASUS_ALLOWED_PARENT_ORIGIN` | Pegasus parent origin (recommended) |
+| `ENABLE_SCOPE_DIAGNOSTICS` | `true` for hosted QA scope debugging; `false` otherwise |
 
 Twilio env vars can remain blank until Slice 3.
+
+### Hosted QA scope debugging
+
+1. Set `ENABLE_SCOPE_DIAGNOSTICS=true` on the Render preview/QA service.
+2. Keep `USE_MOCK_REPORT=true`.
+3. Redeploy, sign in via Pegasus iframe, then call:
+
+```bash
+curl -b cookies.txt https://<your-preview>.onrender.com/api/report/scope
+```
+
+Interpret results:
+
+| Signal | Likely cause |
+|--------|----------------|
+| `hasPegasusToken: false` | iframe token not exchanged with BFF |
+| `resourceCount: 0` | `/user/resources` empty or fetch failed |
+| `destinationCount: 0` with resources | no `twilio/call` destinations on triggers |
+| `destinationCount > 0`, `matchedMockRows: 0` | real destinations do not match mock numbers |
+| `warnings` includes fetch failures | Pegasus resource/trigger fetch failed conservatively |
+
+Report JSON also includes safe `scope.destinationCount`, `scope.matchedMockRows`, and `scope.warnings` (no full destinations).
+
+Disable `ENABLE_SCOPE_DIAGNOSTICS` when QA is complete.
 
 ### Pegasus iframe embedding
 
@@ -165,5 +208,5 @@ curl -i http://localhost:3001/                    # expect HTML
 - Built client served from `dist/client` with SPA fallback
 - Session cookies use `Secure` + `SameSite=None` for iframe embedding
 - `/api/auth/dev-session` returns 404 in production
-- `/api/report/scope` returns 404 in production
+- `/api/report/scope` returns 404 unless `ENABLE_SCOPE_DIAGNOSTICS=true`
 - `/healthz` returns safe boolean diagnostics only

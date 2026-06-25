@@ -56,6 +56,7 @@ async function run() {
       ALLOW_DEV_SESSION: 'true',
       SESSION_SECRET,
       CLIENT_URL: BASE,
+      ENABLE_SCOPE_DIAGNOSTICS: 'false',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

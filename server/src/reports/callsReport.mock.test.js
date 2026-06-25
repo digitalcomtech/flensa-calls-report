@@ -38,4 +38,21 @@ describe('callsReport.mock scoping', () => {
     assert.equal(report.summary.totalCalls, filtered.length);
     assert.equal(report.calls.length, filtered.length);
   });
+
+  it('can attach safe scope meta separately from detail rows', async () => {
+    const report = buildMockCallsReport({
+      from: '2026-06-20',
+      to: '2026-06-23',
+      allowedDestinations: ['+525512345678', '+525587654321'],
+    });
+
+    const scope = {
+      destinationCount: 2,
+      matchedMockRows: report.calls.length,
+      warnings: ['using dev fallback destinations'],
+    };
+
+    assert.equal(scope.matchedMockRows, 3);
+    assert.ok(!('destinations' in scope));
+  });
 });

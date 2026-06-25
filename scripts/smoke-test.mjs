@@ -52,6 +52,7 @@ async function run() {
       NODE_ENV: 'test',
       USE_MOCK_REPORT: 'true',
       ALLOW_DEV_SESSION: 'true',
+      ENABLE_SCOPE_DIAGNOSTICS: 'true',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -88,6 +89,8 @@ async function run() {
     const scope = await scopeRes.json();
     assert(scopeRes.ok, 'authenticated scope endpoint succeeds');
     assert(scope.mode === 'mock', 'scope reports mock mode');
+    assert(scope.authMode === 'iframe', 'scope reports iframe auth mode');
+    assert(scope.hasSession === true, 'scope reports active session');
     assert(scope.destinationCount === 2, 'dev fallback exposes two scoped destinations');
     assert(scope.destinationsPreview.every((p) => p.startsWith('***')), 'scope masks phone numbers');
 
@@ -98,6 +101,9 @@ async function run() {
     assert(reportRes.ok, 'authenticated scoped mock report succeeds');
     assert(report.summary.totalCalls === report.calls.length, 'summary total matches detail count');
     assert(report.summary.totalCalls === 3, 'dev scoped report excludes out-of-scope mock destination');
+    assert(report.scope?.destinationCount === 2, 'report includes safe scope destinationCount');
+    assert(report.scope?.matchedMockRows === 3, 'report includes safe matchedMockRows');
+    assert(Array.isArray(report.scope?.warnings), 'report includes safe scope warnings');
     assert(
       report.summary.answered.count + report.summary.notAnswered.count === report.summary.totalCalls,
       'answered + not answered equals total'
