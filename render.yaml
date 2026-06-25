@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: flensa-calls-report-qa
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: USE_MOCK_REPORT
+        value: "true"
+      - key: ALLOW_DEV_SESSION
+        value: "false"
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        sync: false
+      - key: PEGASUS_API_URL
+        sync: false
+      - key: PEGASUS_CLIENT_ID
+        sync: false
+      - key: PEGASUS_CLIENT_SECRET
+        sync: false
+      - key: PEGASUS_REDIRECT_URI
+        sync: false

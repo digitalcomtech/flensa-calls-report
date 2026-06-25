@@ -1,0 +1,36 @@
+{
+  "name": "flensa-calls-report",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "node --watch server/src/index.js",
+    "dev:client": "vite --config client/vite.config.js",
+    "build": "vite build --config client/vite.config.js",
+    "start": "node server/src/index.js",
+    "test:smoke": "node scripts/smoke-test.mjs",
+    "test:prod": "node scripts/prod-smoke-test.mjs",
+    "test:unit": "node --test server/src/env.test.js server/src/pegasus/triggers.test.js server/src/pegasus/scope.test.js server/src/reports/callsReport.mock.test.js",
+    "test": "npm run test:unit && npm run test:smoke && npm run test:prod"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "json2csv": "^6.0.0-alpha.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.1.1",
+    "twilio": "^5.4.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "vite": "^6.0.7"
+  }
+}
