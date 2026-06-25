@@ -9,17 +9,27 @@ const NESTED_ARRAY_KEYS = [
   'triggers',
   'tasks',
   'entities',
+  'assets',
+  'vehicles',
 ];
 
 const TYPE_MAP_ARRAY_KEYS = [
   'triggers',
   'tasks',
   'vehicles',
+  'assets',
   'resources',
   'entities',
   'items',
   'results',
   'data',
+];
+
+const PEGASUS_USER_RESOURCE_ARRAYS = [
+  { key: 'assets', resourceType: 'asset' },
+  { key: 'tasks', resourceType: 'task' },
+  { key: 'vehicles', resourceType: 'vehicle' },
+  { key: 'triggers', resourceType: 'trigger' },
 ];
 
 const RESOURCE_RECORD_KEYS = new Set([
@@ -104,6 +114,63 @@ export function analyzeResourcesPayloadShape(payload) {
   };
 }
 
+function annotateResourceType(item, resourceType) {
+  if (!isPlainObject(item)) {
+    return null;
+  }
+
+  const annotated = { ...item };
+
+  if (!annotated.resourceType) {
+    annotated.resourceType = resourceType;
+  }
+
+  if (!annotated.type) {
+    annotated.type = resourceType;
+  }
+
+  return annotated;
+}
+
+function isPegasusUserResourcesObject(payload) {
+  if (!isPlainObject(payload)) {
+    return false;
+  }
+
+  return PEGASUS_USER_RESOURCE_ARRAYS.some(
+    ({ key }) => Array.isArray(payload[key]) && payload[key].length > 0
+  );
+}
+
+function flattenPegasusUserResourceObject(payload) {
+  const resources = [];
+
+  for (const { key, resourceType } of PEGASUS_USER_RESOURCE_ARRAYS) {
+    if (!Array.isArray(payload[key])) {
+      continue;
+    }
+
+    for (const item of payload[key]) {
+      const annotated = annotateResourceType(item, resourceType);
+      if (annotated) {
+        resources.push(annotated);
+      }
+    }
+  }
+
+  return resources;
+}
+
+export function extractTopLevelTriggers(payload) {
+  if (!Array.isArray(payload?.triggers)) {
+    return [];
+  }
+
+  return payload.triggers
+    .map((item) => annotateResourceType(item, 'trigger'))
+    .filter(Boolean);
+}
+
 function dedupeResourceRecords(resources) {
   const seen = new Set();
   const deduped = [];
@@ -113,6 +180,7 @@ function dedupeResourceRecords(resources) {
       continue;
     }
 
+    const typeHint = resource.resourceType ?? resource.type ?? 'resource';
     const key =
       resource.id ??
       resource.resource_id ??
@@ -121,11 +189,13 @@ function dedupeResourceRecords(resources) {
       resource.triggerId ??
       JSON.stringify(resource);
 
-    if (seen.has(key)) {
+    const dedupeKey = `${typeHint}:${key}`;
+
+    if (seen.has(dedupeKey)) {
       continue;
     }
 
-    seen.add(key);
+    seen.add(dedupeKey);
     deduped.push(resource);
   }
 
@@ -165,27 +235,50 @@ function isTypeKeyedResourceMap(payload) {
     return false;
   }
 
-  return TYPE_MAP_ARRAY_KEYS.some((key) => Array.isArray(payload[key]));
+  return TYPE_MAP_ARRAY_KEYS.some((key) => Array.isArray(payload[key]) && payload[key].length > 0);
 }
 
 function flattenTypeKeyedResourceMap(payload) {
   const collected = [];
 
-  for (const key of TYPE_MAP_ARRAY_KEYS) {
+  for (const { key, resourceType } of PEGASUS_USER_RESOURCE_ARRAYS) {
     if (Array.isArray(payload[key])) {
-      collected.push(...payload[key]);
+      for (const item of payload[key]) {
+        const annotated = annotateResourceType(item, resourceType);
+        if (annotated) {
+          collected.push(annotated);
+        }
+      }
+    }
+  }
+
+  for (const key of TYPE_MAP_ARRAY_KEYS) {
+    if (PEGASUS_USER_RESOURCE_ARRAYS.some((entry) => entry.key === key)) {
+      continue;
+    }
+
+    if (Array.isArray(payload[key])) {
+      for (const item of payload[key]) {
+        if (isPlainObject(item)) {
+          collected.push(item);
+        }
+      }
     }
   }
 
   if (isPlainObject(payload.entities)) {
     for (const key of TYPE_MAP_ARRAY_KEYS) {
       if (Array.isArray(payload.entities[key])) {
-        collected.push(...payload.entities[key]);
+        for (const item of payload.entities[key]) {
+          if (isPlainObject(item)) {
+            collected.push(item);
+          }
+        }
       }
     }
   }
 
-  return collected.filter((item) => isPlainObject(item));
+  return collected;
 }
 
 function isIdKeyedResourceMap(payload) {
@@ -226,9 +319,13 @@ function normalizeResourceArray(payload) {
   }
 
   for (const key of ['data', 'resources', 'items', 'results']) {
-    if (Array.isArray(payload[key])) {
+    if (Array.isArray(payload[key]) && payload[key].length > 0) {
       return payload[key].filter((item) => isPlainObject(item));
     }
+  }
+
+  if (isPegasusUserResourcesObject(payload)) {
+    return flattenPegasusUserResourceObject(payload);
   }
 
   if (isTypeKeyedResourceMap(payload)) {
@@ -264,7 +361,10 @@ function extractTriggerIds(resources) {
 
     pushTriggerId(ids, resource.trigger_id);
     pushTriggerId(ids, resource.triggerId);
-    pushTriggerId(ids, resource.id);
+
+    if (resource.resourceType === 'trigger' || resource.type === 'trigger') {
+      pushTriggerId(ids, resource.id);
+    }
 
     if (resource.trigger && typeof resource.trigger === 'object') {
       pushTriggerId(ids, resource.trigger.id ?? resource.trigger.trigger_id);
@@ -284,6 +384,43 @@ function extractTriggerIds(resources) {
   return [...new Set(ids)];
 }
 
+function hasSupportedTopLevelResourceArrays(payload) {
+  if (!isPlainObject(payload)) {
+    return false;
+  }
+
+  return PEGASUS_USER_RESOURCE_ARRAYS.some(
+    ({ key }) => Array.isArray(payload[key]) && payload[key].length > 0
+  );
+}
+
+function buildResourceWarnings(payload, resources) {
+  const warnings = [];
+
+  if (payload !== null && resources.length === 0 && !hasSupportedTopLevelResourceArrays(payload)) {
+    warnings.push('resources response shape unrecognized or empty');
+  }
+
+  return warnings;
+}
+
+export function normalizeResourcesFromPayload(payload) {
+  const shape = analyzeResourcesPayloadShape(payload);
+  const resources = dedupeResourceRecords(normalizeResourceArray(payload));
+  const triggers = extractTopLevelTriggers(payload);
+  const triggerIds = extractTriggerIds([...resources, ...triggers]);
+  const warnings = buildResourceWarnings(payload, resources);
+
+  return {
+    rawCount: resources.length,
+    resources,
+    triggers,
+    triggerIds,
+    warnings,
+    shape,
+  };
+}
+
 function logResourcesShapeDiagnostics(shape) {
   console.info('[scope-diagnostics] resources shape', {
     resourcesRawType: shape.resourcesRawType,
@@ -297,26 +434,13 @@ function logResourcesShapeDiagnostics(shape) {
  */
 export async function listUserResources({ token }) {
   const payload = await pegasusGet('/user/resources', { token });
-  const shape = analyzeResourcesPayloadShape(payload);
-  const resources = dedupeResourceRecords(normalizeResourceArray(payload));
-  const triggerIds = extractTriggerIds(resources);
-  const warnings = [];
-
-  if (payload !== null && resources.length === 0) {
-    warnings.push('resources response shape unrecognized or empty');
-  }
+  const result = normalizeResourcesFromPayload(payload);
 
   if (isScopeDiagnosticsEnabled()) {
-    logResourcesShapeDiagnostics(shape);
+    logResourcesShapeDiagnostics(result.shape);
   }
 
-  return {
-    rawCount: resources.length,
-    resources,
-    triggerIds,
-    warnings,
-    shape,
-  };
+  return result;
 }
 
 export {
@@ -325,4 +449,5 @@ export {
   looksLikeResourceRecord,
   isTypeKeyedResourceMap,
   isIdKeyedResourceMap,
+  isPegasusUserResourcesObject,
 };

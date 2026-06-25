@@ -3,8 +3,22 @@ import { describe, it } from 'node:test';
 import {
   analyzeResourcesPayloadShape,
   normalizeResourceArray,
+  normalizeResourcesFromPayload,
 } from './resources.js';
+import { extractTwilioDestinations } from './triggers.js';
 import { containsFullPhoneNumber } from '../reports/scopeDiagnostics.js';
+
+const PEGASUS194_FIXTURE = {
+  username: 'redacted',
+  scopes: {},
+  email: 'user@example.com',
+  id: 99,
+  prefs: {},
+  assets: [{ id: 1 }],
+  tasks: [{ id: 2 }],
+  vehicles: [{ id: 3 }],
+  triggers: [{ id: 4, processes: [] }],
+};
 
 describe('normalizeResourceArray', () => {
   it('supports raw arrays', () => {
@@ -82,6 +96,55 @@ describe('normalizeResourceArray', () => {
     assert.deepEqual(normalizeResourceArray({}), []);
     assert.deepEqual(normalizeResourceArray({ meta: { total: 0 } }), []);
     assert.deepEqual(normalizeResourceArray('unexpected'), []);
+  });
+
+  it('supports pegasus194 user object with top-level resource arrays', () => {
+    const resources = normalizeResourceArray(PEGASUS194_FIXTURE);
+
+    assert.equal(resources.length, 4);
+    assert.equal(resources.find((resource) => resource.id === 1)?.resourceType, 'asset');
+    assert.equal(resources.find((resource) => resource.id === 2)?.resourceType, 'task');
+    assert.equal(resources.find((resource) => resource.id === 3)?.resourceType, 'vehicle');
+    assert.equal(resources.find((resource) => resource.id === 4)?.resourceType, 'trigger');
+  });
+});
+
+describe('normalizeResourcesFromPayload', () => {
+  it('normalizes pegasus194 hosted shape counts and triggers', () => {
+    const hostedShape = {
+      username: 'redacted',
+      scopes: {},
+      email: 'user@example.com',
+      id: 99,
+      prefs: {},
+      assets: Array.from({ length: 204 }, (_, index) => ({ id: `asset-${index}` })),
+      tasks: Array.from({ length: 88 }, (_, index) => ({ id: `task-${index}` })),
+      vehicles: Array.from({ length: 3791 }, (_, index) => ({ id: `vehicle-${index}` })),
+      triggers: Array.from({ length: 483 }, (_, index) => ({ id: `trigger-${index}` })),
+    };
+
+    const result = normalizeResourcesFromPayload(hostedShape);
+
+    assert.equal(result.rawCount, 4566);
+    assert.equal(result.triggers.length, 483);
+    assert.ok(!result.warnings.includes('resources response shape unrecognized or empty'));
+    assert.equal(extractTwilioDestinations(result.triggers).triggerCount, 483);
+    assert.equal(containsFullPhoneNumber(result.shape), false);
+    assert.ok(!('assets' in result.shape));
+  });
+
+  it('collects triggers without a type field and preserves safe diagnostics shape', () => {
+    const result = normalizeResourcesFromPayload(PEGASUS194_FIXTURE);
+
+    assert.equal(result.rawCount, 4);
+    assert.equal(result.triggers.length, 1);
+    assert.equal(result.triggers[0].id, 4);
+    assert.equal(result.triggers[0].resourceType, 'trigger');
+    assert.ok(!result.warnings.includes('resources response shape unrecognized or empty'));
+    assert.equal(extractTwilioDestinations(result.triggers).triggerCount, 1);
+    assert.equal(result.shape.resourcesRawType, 'object');
+    assert.ok(result.shape.resourcesTopLevelKeys.includes('triggers'));
+    assert.ok(result.shape.candidateArrayPaths.some((entry) => entry.path === 'triggers' && entry.count === 1));
   });
 });
 

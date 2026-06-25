@@ -108,16 +108,21 @@ export async function resolveUserScope(user) {
     });
   }
 
-  const triggers = await fetchTriggersForResources({
-    token: pegasusToken,
-    resources: resourceResult.resources,
-    triggerIds: resourceResult.triggerIds,
-  });
+  const triggers =
+    resourceResult.triggers.length > 0
+      ? resourceResult.triggers
+      : await fetchTriggersForResources({
+          token: pegasusToken,
+          resources: resourceResult.resources,
+          triggerIds: resourceResult.triggerIds,
+        });
 
   const extracted = extractTwilioDestinations(triggers);
   const warnings = [...resourceResult.warnings];
 
-  if (resourceResult.rawCount > 0 && extracted.destinationCount === 0) {
+  if (resourceResult.triggers.length > 0 && extracted.destinationCount === 0) {
+    warnings.push('no twilio/call destinations found in triggers');
+  } else if (resourceResult.rawCount > 0 && extracted.destinationCount === 0) {
     warnings.push('no twilio/call destinations found for user resources');
   }
 

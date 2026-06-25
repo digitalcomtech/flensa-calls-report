@@ -165,6 +165,14 @@ export function collectTriggersFromResources(resources) {
     }
 
     if (
+      resource.resourceType === 'trigger' ||
+      resource.type === 'trigger'
+    ) {
+      triggers.push(resource);
+      continue;
+    }
+
+    if (
       Array.isArray(resource.processes) ||
       Array.isArray(resource.process) ||
       (resource.process && typeof resource.process === 'object') ||
