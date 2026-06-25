@@ -1,6 +1,7 @@
 import { getPegasusTokenFromUser, isDevSessionAllowed } from '../env.js';
 import { listUserResources } from './resources.js';
 import { buildTriggerDiagnostics } from './triggerDiagnostics.js';
+import { fetchTriggerDetails, shouldHydrateTriggerDetails } from './triggerDetails.js';
 import {
   collectTriggersFromResources,
   extractTwilioDestinations,
@@ -20,6 +21,7 @@ function emptyScope(overrides = {}) {
     destinations: [],
     warnings: [],
     triggerDiagnostics: buildTriggerDiagnostics([]),
+    triggerHydration: null,
     ...overrides,
   };
 }
@@ -110,7 +112,7 @@ export async function resolveUserScope(user) {
     });
   }
 
-  const triggers =
+  let triggers =
     resourceResult.triggers.length > 0
       ? resourceResult.triggers
       : await fetchTriggersForResources({
@@ -119,14 +121,37 @@ export async function resolveUserScope(user) {
           triggerIds: resourceResult.triggerIds,
         });
 
-  const extracted = extractTwilioDestinations(triggers);
+  let extracted = extractTwilioDestinations(triggers);
   const warnings = [...resourceResult.warnings];
   const normalizedTriggerCount = resourceResult.triggers.length || triggers.length;
+  let triggerHydration = null;
+  let hydratedTriggers = false;
 
-  if (resourceResult.triggers.length > 0 && extracted.destinationCount === 0) {
-    warnings.push('no twilio/call destinations found in triggers');
-  } else if (resourceResult.rawCount > 0 && extracted.destinationCount === 0) {
-    warnings.push('no twilio/call destinations found for user resources');
+  if (shouldHydrateTriggerDetails(triggers, extracted)) {
+    const hydration = await fetchTriggerDetails({
+      token: pegasusToken,
+      triggerRefs: triggers,
+    });
+    triggerHydration = hydration.diagnostics;
+
+    if (hydration.triggers.length > 0) {
+      triggers = hydration.triggers;
+      hydratedTriggers = true;
+      extracted = extractTwilioDestinations(triggers);
+      warnings.push('hydrated trigger details');
+    } else if (triggerHydration.warnings.length > 0) {
+      warnings.push('trigger detail hydration failed');
+    }
+  }
+
+  if (extracted.destinationCount === 0) {
+    if (hydratedTriggers) {
+      warnings.push('no twilio/call destinations found in hydrated triggers');
+    } else if (resourceResult.triggers.length > 0) {
+      warnings.push('no twilio/call destinations found in triggers');
+    } else if (resourceResult.rawCount > 0) {
+      warnings.push('no twilio/call destinations found for user resources');
+    }
   }
 
   return {
@@ -140,5 +165,6 @@ export async function resolveUserScope(user) {
     resourceShape: resourceResult.shape,
     normalization: resourceResult.normalization,
     triggerDiagnostics: buildTriggerDiagnostics(triggers),
+    triggerHydration,
   };
 }

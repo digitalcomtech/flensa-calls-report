@@ -108,6 +108,60 @@ describe('/api/report/scope diagnostics gate', () => {
       assert.ok(!('triggerDiagnostics' in compactBody));
       assert.ok('triggerDiagnostics' in detailedBody);
       assert.equal(containsFullPhoneNumber(detailedBody.triggerDiagnostics), false);
+      assert.ok(!('triggerHydration' in compactBody));
+    } finally {
+      process.env.ENABLE_SCOPE_DIAGNOSTICS = previous;
+    }
+  });
+
+  it('includes triggerHydration only when includeTriggerDiagnostics=true', async () => {
+    const previous = process.env.ENABLE_SCOPE_DIAGNOSTICS;
+    process.env.ENABLE_SCOPE_DIAGNOSTICS = 'true';
+
+    try {
+      const { buildSafeScopeDiagnostics } = await import('../reports/scopeDiagnostics.js');
+
+      const diagnostics = buildSafeScopeDiagnostics(
+        {
+          hasPegasusToken: true,
+          resourceCount: 2,
+          triggerCount: 2,
+          destinationCount: 1,
+          destinations: ['+525511111111'],
+          warnings: ['hydrated trigger details'],
+          triggerDiagnostics: {
+            sampledTriggerCount: 2,
+            triggerTopLevelKeysSeen: ['processes'],
+            processArrayPaths: [{ path: 'processes', count: 2 }],
+            processObjectPaths: [],
+            processTypeFieldsSeen: ['type'],
+            processTypeValuesSeen: ['twilio/call'],
+            destinationFieldPathsSeen: [{ path: 'config.destinations', count: 2 }],
+          },
+          triggerHydration: {
+            attempted: true,
+            inputTriggerRefCount: 2,
+            uniqueTriggerIdCount: 2,
+            hydratedTriggerCount: 2,
+            method: 'list',
+            httpStatus: 200,
+            warnings: [],
+          },
+        },
+        {
+          mode: 'mock',
+          authMode: 'iframe',
+          hasSession: true,
+          includeResourceShape: true,
+          includeTriggerDiagnostics: true,
+        }
+      );
+
+      assert.ok('triggerHydration' in diagnostics);
+      assert.equal(diagnostics.triggerHydration.method, 'list');
+      assert.equal(diagnostics.triggerHydration.hydratedTriggerCount, 2);
+      assert.equal(containsFullPhoneNumber(diagnostics), false);
+      assert.ok(!('pegasusToken' in diagnostics));
     } finally {
       process.env.ENABLE_SCOPE_DIAGNOSTICS = previous;
     }

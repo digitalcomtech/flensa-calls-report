@@ -24,7 +24,7 @@ function pegasusHeaders(token) {
 /**
  * Authenticated Pegasus GET. Never logs the token.
  */
-export async function pegasusGet(path, { token }) {
+export async function pegasusGet(path, { token, signal } = {}) {
   if (!token) {
     throw new PegasusApiError(401, 'Pegasus token is required');
   }
@@ -37,6 +37,7 @@ export async function pegasusGet(path, { token }) {
     response = await fetch(buildUrl(path), {
       method: 'GET',
       headers: pegasusHeaders(token),
+      signal,
     });
   } catch {
     throw new PegasusApiError(503, 'Pegasus API is unreachable');

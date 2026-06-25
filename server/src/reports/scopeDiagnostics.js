@@ -65,6 +65,18 @@ export function buildSafeScopeDiagnostics(
         count: entry.count,
       })),
     };
+
+    if (scope.triggerHydration) {
+      diagnostics.triggerHydration = {
+        attempted: Boolean(scope.triggerHydration.attempted),
+        inputTriggerRefCount: scope.triggerHydration.inputTriggerRefCount ?? 0,
+        uniqueTriggerIdCount: scope.triggerHydration.uniqueTriggerIdCount ?? 0,
+        hydratedTriggerCount: scope.triggerHydration.hydratedTriggerCount ?? 0,
+        method: scope.triggerHydration.method ?? 'none',
+        httpStatus: scope.triggerHydration.httpStatus ?? null,
+        warnings: [...(scope.triggerHydration.warnings ?? [])],
+      };
+    }
   }
 
   return diagnostics;
