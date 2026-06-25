@@ -14,7 +14,7 @@
     "start": "node server/src/index.js",
     "test:smoke": "node scripts/smoke-test.mjs",
     "test:prod": "node scripts/prod-smoke-test.mjs",
-    "test:unit": "node --test server/src/env.test.js server/src/routes/auth.iframe.test.js server/src/routes/scope.routes.test.js server/src/pegasus/triggers.test.js server/src/pegasus/scope.test.js server/src/pegasus/resources.test.js server/src/reports/callsReport.mock.test.js client/src/auth/pegasusIframeAuth.test.js",
+    "test:unit": "node --test server/src/env.test.js server/src/routes/auth.iframe.test.js server/src/routes/httpResponse.test.js server/src/routes/scope.routes.test.js server/src/pegasus/triggers.test.js server/src/pegasus/scope.test.js server/src/pegasus/resources.test.js server/src/reports/callsReport.mock.test.js client/src/auth/pegasusIframeAuth.test.js",
     "test": "npm run test:unit && npm run test:smoke && npm run test:prod"
   },
   "dependencies": {

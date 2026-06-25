@@ -12,9 +12,9 @@ router.get('/calls', requireAuth, async (req, res) => {
       to: req.query.to,
       user: req.session.user,
     });
-    res.json(report);
+    return res.json(report);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
 });
 
@@ -31,9 +31,9 @@ router.get('/calls/export', requireAuth, async (req, res) => {
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(csv);
+    return res.send(csv);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
 });
 

@@ -10,7 +10,7 @@ import {
 const router = Router();
 
 router.get('/iframe-config', (_req, res) => {
-  res.json({
+  return res.json({
     authMode: 'iframe',
     allowedParentOrigin: process.env.PEGASUS_ALLOWED_PARENT_ORIGIN ?? '',
   });
@@ -34,14 +34,15 @@ router.post('/iframe', async (req, res) => {
       ...profile,
       pegasusToken: token,
     };
+    req.persistSession();
 
-    res.json({
+    return res.json({
       ok: true,
       user: sanitizeUserForClient(req.session.user),
     });
   } catch {
     console.error('Iframe auth validation failed');
-    res.status(401).json({
+    return res.status(401).json({
       error: isProduction() ? 'Authentication failed' : 'Invalid Pegasus token',
     });
   }
@@ -58,8 +59,9 @@ router.post('/dev-session', (req, res) => {
     email: 'dev@example.com',
     isDevSession: true,
   };
+  req.persistSession();
 
-  res.json({
+  return res.json({
     ok: true,
     user: sanitizeUserForClient(req.session.user),
   });
@@ -70,12 +72,12 @@ router.get('/me', (req, res) => {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  res.json({ user: sanitizeUserForClient(req.session.user) });
+  return res.json({ user: sanitizeUserForClient(req.session.user) });
 });
 
 router.post('/logout', (req, res) => {
   req.clearSession();
-  res.json({ ok: true });
+  return res.json({ ok: true });
 });
 
 export default router;

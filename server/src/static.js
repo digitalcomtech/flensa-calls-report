@@ -30,6 +30,6 @@ export function configureProductionStatic(app) {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       return next();
     }
-    res.sendFile(path.join(clientDistPath, 'index.html'));
+    return res.sendFile(path.join(clientDistPath, 'index.html'));
   });
 }

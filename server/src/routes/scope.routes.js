@@ -14,7 +14,7 @@ router.get('/scope', requireAuth, async (req, res) => {
   try {
     const scope = await resolveUserScope(req.session.user);
 
-    res.json(
+    return res.json(
       buildSafeScopeDiagnostics(scope, {
         mode: env.useMockReport ? 'mock' : 'live',
         authMode: env.pegasus.authMode,
@@ -23,7 +23,7 @@ router.get('/scope', requireAuth, async (req, res) => {
       })
     );
   } catch {
-    res.status(500).json({ error: 'Failed to resolve report scope' });
+    return res.status(500).json({ error: 'Failed to resolve report scope' });
   }
 });
 
