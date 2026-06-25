@@ -12,7 +12,7 @@ This app is designed to run **inside Pegasus as an iframe**. Authentication uses
 |-------|--------|
 | Slice 1 | Foundation: mock report, healthz, smoke tests |
 | Slice 2 | Pegasus resource/trigger destination scoping (Twilio still mocked) |
-| Slice 3 | Live Twilio call log integration (not started) |
+| Slice 3 | Live Twilio call log integration (API key auth) |
 
 ## Prerequisites
 
@@ -26,7 +26,24 @@ cp .env.example .env
 npm install
 ```
 
-Keep `USE_MOCK_REPORT=true` for local development and first Render QA. Twilio remains stubbed until Slice 3.
+Keep `USE_MOCK_REPORT=true` for local development and first Render QA. Set `USE_MOCK_REPORT=false` only after Pegasus destination scoping works and Twilio API key credentials are configured on Render.
+
+### Twilio env vars (Slice 3)
+
+| Variable | Purpose |
+|----------|---------|
+| `TWILIO_ACCOUNT_SID` | Twilio account used in REST URL path |
+| `TWILIO_API_KEY_SID` | Basic auth username (API Key SID) |
+| `TWILIO_API_KEY_SECRET` | Basic auth password (API Key Secret) |
+| `TWILIO_AUTH_TOKEN` | Legacy fallback for `twilioConfigured` health check only |
+
+Live mode queries:
+
+`GET https://api.twilio.com/2010-04-01/Accounts/{TWILIO_ACCOUNT_SID}/Calls.json`
+
+with Basic auth `TWILIO_API_KEY_SID:TWILIO_API_KEY_SECRET`, filters by Pegasus-scoped destination numbers (`call.to`), and returns the same report shape as mock mode.
+
+Do not commit `.env` or raw `twilio_calls_*.json` fixtures.
 
 ### Pegasus iframe env vars
 
@@ -125,7 +142,7 @@ Never exposes tokens, raw Pegasus payloads, or full phone numbers. Disable befor
 1. Authenticate via iframe token (or dev session when allowed).
 2. `GET /user/resources` with `Authenticate` header.
 3. Collect triggers and extract `twilio/call` destinations.
-4. Mock report rows filtered to those destinations only.
+4. Mock or live Twilio calls filtered to those destinations only.
 5. User with no resolved destinations gets an **empty** report.
 
 ## Render QA deployment
@@ -155,7 +172,20 @@ Deploy as a **single Web Service** (not Static Site). Use **PR Previews** for QA
 | `PEGASUS_ALLOWED_PARENT_ORIGIN` | Pegasus parent origin (recommended) |
 | `ENABLE_SCOPE_DIAGNOSTICS` | `true` for hosted QA scope debugging; `false` otherwise |
 
-Twilio env vars can remain blank until Slice 3.
+Twilio env vars can remain blank while `USE_MOCK_REPORT=true`.
+
+### Enable live Twilio on Render
+
+1. Confirm Pegasus scoping works (`destinationCount > 0` via `/api/report/scope` when diagnostics are enabled).
+2. Set Render env vars (sync: false / secret values):
+   - `TWILIO_ACCOUNT_SID`
+   - `TWILIO_API_KEY_SID`
+   - `TWILIO_API_KEY_SECRET`
+3. Set `USE_MOCK_REPORT=false`
+4. Redeploy and verify `/healthz` shows `twilioConfigured: true`
+5. Load report in iframe; JSON should include `source: "twilio"` and `scope.matchedTwilioRows`
+
+Keep `USE_MOCK_REPORT=true` on PR previews until destination scoping is validated.
 
 ### Hosted QA scope debugging
 
@@ -177,7 +207,7 @@ Interpret results:
 | `destinationCount > 0`, `matchedMockRows: 0` | real destinations do not match mock numbers |
 | `warnings` includes fetch failures | Pegasus resource/trigger fetch failed conservatively |
 
-Report JSON also includes safe `scope.destinationCount`, `scope.matchedMockRows`, and `scope.warnings` (no full destinations).
+Report JSON also includes safe `scope.destinationCount`, `scope.matchedMockRows` or `scope.matchedTwilioRows`, and `scope.warnings` (no full destinations).
 
 Disable `ENABLE_SCOPE_DIAGNOSTICS` when QA is complete.
 

@@ -27,12 +27,19 @@ export function buildSafeScopeDiagnostics(scope, { mode, authMode, hasSession, i
   return diagnostics;
 }
 
-export function buildSafeReportScopeMeta(scope, matchedMockRows) {
-  return {
+export function buildSafeReportScopeMeta(scope, matchedRows, { source = 'mock' } = {}) {
+  const meta = {
     destinationCount: scope.destinationCount ?? 0,
-    matchedMockRows,
     warnings: [...(scope.warnings ?? [])],
   };
+
+  if (source === 'twilio') {
+    meta.matchedTwilioRows = matchedRows;
+  } else {
+    meta.matchedMockRows = matchedRows;
+  }
+
+  return meta;
 }
 
 export function containsFullPhoneNumber(value) {

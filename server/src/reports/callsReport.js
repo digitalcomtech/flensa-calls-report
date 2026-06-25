@@ -1,5 +1,6 @@
 import { env } from '../env.js';
 import { resolveUserScope } from '../pegasus/scope.js';
+import { buildLiveTwilioCallsReport } from './callsReport.live.js';
 import { buildMockCallsReport } from './callsReport.mock.js';
 import { buildSafeReportScopeMeta } from './scopeDiagnostics.js';
 
@@ -15,11 +16,9 @@ export async function buildCallsReport({ from, to, user } = {}) {
 
     return {
       ...report,
-      scope: buildSafeReportScopeMeta(scope, report.calls.length),
+      scope: buildSafeReportScopeMeta(scope, report.calls.length, { source: 'mock' }),
     };
   }
 
-  throw new Error(
-    'Live Twilio/Pegasus report integration is not enabled yet. Set USE_MOCK_REPORT=true for development.'
-  );
+  return buildLiveTwilioCallsReport({ from, to, scope });
 }

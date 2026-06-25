@@ -1,4 +1,5 @@
 import { buildSummary } from './reportSummary.js';
+import { parseReportDateRange } from './dateRange.js';
 
 export const MOCK_CALLS = [
   {
@@ -31,34 +32,13 @@ export const MOCK_CALLS = [
   },
 ];
 
-function parseDate(value, fallback) {
-  if (!value) return fallback;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid date: ${value}`);
-  }
-  return date;
-}
-
-function endOfDay(date) {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-
 export function filterCallsByDestinations(calls, allowedDestinations) {
   const allowed = new Set(allowedDestinations);
   return calls.filter((call) => allowed.has(call.destination));
 }
 
 export function buildMockCallsReport({ from, to, allowedDestinations = [] } = {}) {
-  const end = endOfDay(parseDate(to, new Date()));
-  const start = parseDate(from, new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000));
-  start.setHours(0, 0, 0, 0);
-
-  if (start > end) {
-    throw new Error('`from` must be on or before `to`');
-  }
+  const { start, end } = parseReportDateRange(from, to);
 
   const inRange = MOCK_CALLS.filter((call) => {
     const callTime = new Date(call.dateTime);

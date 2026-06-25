@@ -39,6 +39,8 @@ export const env = {
   },
   twilio: {
     accountSid: optional('TWILIO_ACCOUNT_SID'),
+    apiKeySid: optional('TWILIO_API_KEY_SID'),
+    apiKeySecret: optional('TWILIO_API_KEY_SECRET'),
     authToken: optional('TWILIO_AUTH_TOKEN'),
   },
 };
@@ -52,7 +54,16 @@ export function isPegasusApiConfigured() {
 }
 
 export function isTwilioConfigured() {
-  return Boolean(env.twilio.accountSid && env.twilio.authToken);
+  const accountSid = process.env.TWILIO_ACCOUNT_SID ?? env.twilio.accountSid;
+  const apiKeySid = process.env.TWILIO_API_KEY_SID ?? env.twilio.apiKeySid;
+  const apiKeySecret = process.env.TWILIO_API_KEY_SECRET ?? env.twilio.apiKeySecret;
+  const authToken = process.env.TWILIO_AUTH_TOKEN ?? env.twilio.authToken;
+
+  if (accountSid && apiKeySid && apiKeySecret) {
+    return true;
+  }
+
+  return Boolean(accountSid && authToken);
 }
 
 export function isScopeDiagnosticsEnabled() {
