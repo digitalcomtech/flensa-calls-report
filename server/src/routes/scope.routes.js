@@ -13,6 +13,7 @@ router.get('/scope', requireAuth, async (req, res) => {
 
   try {
     const scope = await resolveUserScope(req.session.user);
+    const includeTriggerDiagnostics = req.query.includeTriggerDiagnostics === 'true';
 
     return res.json(
       buildSafeScopeDiagnostics(scope, {
@@ -20,6 +21,7 @@ router.get('/scope', requireAuth, async (req, res) => {
         authMode: env.pegasus.authMode,
         hasSession: true,
         includeResourceShape: true,
+        includeTriggerDiagnostics,
       })
     );
   } catch {

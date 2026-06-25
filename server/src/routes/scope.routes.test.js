@@ -83,6 +83,31 @@ describe('/api/report/scope diagnostics gate', () => {
       assert.ok(!('resources' in body));
       assert.ok(!('triggers' in body));
       assert.ok(!('resourcesRawType' in body));
+      assert.ok(!('triggerDiagnostics' in body));
+    } finally {
+      process.env.ENABLE_SCOPE_DIAGNOSTICS = previous;
+    }
+  });
+
+  it('includes triggerDiagnostics only when includeTriggerDiagnostics=true', async () => {
+    const previous = process.env.ENABLE_SCOPE_DIAGNOSTICS;
+    process.env.ENABLE_SCOPE_DIAGNOSTICS = 'true';
+
+    try {
+      const compact = await fetch(`${baseUrl}/api/report/scope`, {
+        headers: { Cookie: sessionCookie },
+      });
+      const detailed = await fetch(`${baseUrl}/api/report/scope?includeTriggerDiagnostics=true`, {
+        headers: { Cookie: sessionCookie },
+      });
+      const compactBody = await compact.json();
+      const detailedBody = await detailed.json();
+
+      assert.equal(compact.status, 200);
+      assert.equal(detailed.status, 200);
+      assert.ok(!('triggerDiagnostics' in compactBody));
+      assert.ok('triggerDiagnostics' in detailedBody);
+      assert.equal(containsFullPhoneNumber(detailedBody.triggerDiagnostics), false);
     } finally {
       process.env.ENABLE_SCOPE_DIAGNOSTICS = previous;
     }

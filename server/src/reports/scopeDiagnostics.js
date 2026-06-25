@@ -2,7 +2,10 @@ import { maskDestinations } from '../utils/phoneMask.js';
 
 const FULL_PHONE_PATTERN = /\+?\d{7,}/;
 
-export function buildSafeScopeDiagnostics(scope, { mode, authMode, hasSession, includeResourceShape = false }) {
+export function buildSafeScopeDiagnostics(
+  scope,
+  { mode, authMode, hasSession, includeResourceShape = false, includeTriggerDiagnostics = false } = {}
+) {
   const diagnostics = {
     mode,
     authMode,
@@ -22,6 +25,27 @@ export function buildSafeScopeDiagnostics(scope, { mode, authMode, hasSession, i
       path: entry.path,
       count: entry.count,
     }));
+  }
+
+  if (includeTriggerDiagnostics && scope.triggerDiagnostics) {
+    diagnostics.triggerDiagnostics = {
+      sampledTriggerCount: scope.triggerDiagnostics.sampledTriggerCount ?? 0,
+      triggerTopLevelKeysSeen: [...(scope.triggerDiagnostics.triggerTopLevelKeysSeen ?? [])],
+      processArrayPaths: (scope.triggerDiagnostics.processArrayPaths ?? []).map((entry) => ({
+        path: entry.path,
+        count: entry.count,
+      })),
+      processObjectPaths: (scope.triggerDiagnostics.processObjectPaths ?? []).map((entry) => ({
+        path: entry.path,
+        count: entry.count,
+      })),
+      processTypeFieldsSeen: [...(scope.triggerDiagnostics.processTypeFieldsSeen ?? [])],
+      processTypeValuesSeen: [...(scope.triggerDiagnostics.processTypeValuesSeen ?? [])],
+      destinationFieldPathsSeen: (scope.triggerDiagnostics.destinationFieldPathsSeen ?? []).map((entry) => ({
+        path: entry.path,
+        count: entry.count,
+      })),
+    };
   }
 
   return diagnostics;

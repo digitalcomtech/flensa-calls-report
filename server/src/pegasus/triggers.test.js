@@ -83,4 +83,83 @@ describe('extractTwilioDestinations', () => {
 
     assert.deepEqual(result.destinations, ['+525566666666']);
   });
+
+  it('extracts destinations from process object with provider twilio and action call', () => {
+    const result = extractTwilioDestinations({
+      id: 't6',
+      process: {
+        provider: 'twilio',
+        action: 'call',
+        params: { to: '+525577777777' },
+      },
+    });
+
+    assert.deepEqual(result.destinations, ['+525577777777']);
+  });
+
+  it('extracts destinations from actions[] with service twilio and recipients[]', () => {
+    const result = extractTwilioDestinations({
+      id: 't7',
+      actions: [
+        {
+          service: 'twilio',
+          name: 'call',
+          recipients: ['+525588888888', '+525588888888'],
+        },
+      ],
+    });
+
+    assert.equal(result.destinationCount, 1);
+    assert.deepEqual(result.destinations, ['+525588888888']);
+  });
+
+  it('extracts destinations from config.actions[] with plugin twilio and settings.destinations[]', () => {
+    const result = extractTwilioDestinations({
+      id: 't8',
+      config: {
+        actions: [
+          {
+            plugin: 'twilio',
+            type: 'call',
+            settings: { destinations: ['+525599999999'] },
+          },
+        ],
+      },
+    });
+
+    assert.deepEqual(result.destinations, ['+525599999999']);
+  });
+
+  it('ignores non-twilio processes', () => {
+    const result = extractTwilioDestinations({
+      id: 't9',
+      actions: [
+        {
+          service: 'email',
+          name: 'send',
+          recipients: ['user@example.com'],
+        },
+        {
+          type: 'twilio/call',
+          config: { destinations: ['+525500000001'] },
+        },
+      ],
+    });
+
+    assert.deepEqual(result.destinations, ['+525500000001']);
+  });
+
+  it('matches twilio/call case-insensitively', () => {
+    const result = extractTwilioDestinations({
+      id: 't10',
+      processes: [
+        {
+          type: 'Twilio/Call',
+          destinations: ['+525511122233'],
+        },
+      ],
+    });
+
+    assert.deepEqual(result.destinations, ['+525511122233']);
+  });
 });

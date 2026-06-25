@@ -1,5 +1,6 @@
 import { getPegasusTokenFromUser, isDevSessionAllowed } from '../env.js';
 import { listUserResources } from './resources.js';
+import { buildTriggerDiagnostics } from './triggerDiagnostics.js';
 import {
   collectTriggersFromResources,
   extractTwilioDestinations,
@@ -18,6 +19,7 @@ function emptyScope(overrides = {}) {
     destinationCount: 0,
     destinations: [],
     warnings: [],
+    triggerDiagnostics: buildTriggerDiagnostics([]),
     ...overrides,
   };
 }
@@ -135,5 +137,6 @@ export async function resolveUserScope(user) {
     destinations: extracted.destinations,
     warnings,
     resourceShape: resourceResult.shape,
+    triggerDiagnostics: buildTriggerDiagnostics(triggers),
   };
 }
