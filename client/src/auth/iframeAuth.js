@@ -1,20 +1,10 @@
-import { exchangeIframeToken, getIframeConfig, getMe } from '../api/authClient.js';
-
-function readQueryToken() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get('auth')?.trim() || null;
-}
-
-function removeQueryToken() {
-  const params = new URLSearchParams(window.location.search);
-  if (!params.has('auth')) {
-    return;
-  }
-  params.delete('auth');
-  const query = params.toString();
-  const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
-  window.history.replaceState({}, '', nextUrl);
-}
+import { getIframeConfig, getMe } from '../api/authClient.js';
+import {
+  clearPegasusTokenFromBrowserUrl,
+  exchangePegasusIframeToken,
+  PEGASUS_AUTH_ERROR_MESSAGE,
+  readPegasusTokenFromBrowserUrl,
+} from './pegasusIframeAuth.js';
 
 function isAllowedOrigin(eventOrigin, allowedParentOrigin) {
   if (!allowedParentOrigin) {
@@ -47,30 +37,47 @@ function listenForParentToken(allowedParentOrigin, onToken) {
 }
 
 async function establishSessionFromToken(token) {
-  await exchangeIframeToken(token);
-  const { user } = await getMe();
-  return user;
+  try {
+    return await exchangePegasusIframeToken(token);
+  } catch {
+    throw new Error(PEGASUS_AUTH_ERROR_MESSAGE);
+  }
+}
+
+async function exchangeBrowserUrlToken() {
+  const urlToken = readPegasusTokenFromBrowserUrl();
+  if (!urlToken) {
+    return null;
+  }
+
+  try {
+    const user = await establishSessionFromToken(urlToken);
+    clearPegasusTokenFromBrowserUrl();
+    return user;
+  } catch (error) {
+    clearPegasusTokenFromBrowserUrl();
+    throw error;
+  }
 }
 
 /**
  * Bootstrap Pegasus iframe auth.
- * Priority: existing session → URL ?auth= → parent postMessage → dev manual token.
+ * Priority: existing session → URL token → parent postMessage → dev manual token.
  */
 export async function bootstrapIframeAuth({ manualToken } = {}) {
   try {
     const existing = await getMe();
     if (existing?.user) {
+      clearPegasusTokenFromBrowserUrl();
       return { status: 'authenticated', user: existing.user };
     }
   } catch {
     // continue bootstrap
   }
 
-  const queryToken = readQueryToken();
-  if (queryToken) {
-    const user = await establishSessionFromToken(queryToken);
-    removeQueryToken();
-    return { status: 'authenticated', user };
+  const urlUser = await exchangeBrowserUrlToken();
+  if (urlUser) {
+    return { status: 'authenticated', user: urlUser };
   }
 
   if (manualToken?.trim()) {

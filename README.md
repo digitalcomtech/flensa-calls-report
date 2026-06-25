@@ -38,14 +38,16 @@ Keep `USE_MOCK_REPORT=true` for local development and first Render QA. Twilio re
 
 ## Authentication flow (iframe)
 
-1. App loads inside Pegasus iframe.
-2. Frontend receives Pegasus token via `?auth=` query param or parent `postMessage` (`{ type: "PEGASUS_AUTH", token: "..." }`).
-3. Frontend sends token to `POST /api/auth/iframe`.
-4. BFF validates token with `GET {PEGASUS_API_URL}/login` using header `Authenticate: <token>`.
-5. BFF stores Pegasus token server-side only and creates a secure session cookie.
-6. Reports call `GET {PEGASUS_API_URL}/user/resources` with the stored token to scope destinations.
+1. App loads inside Pegasus iframe (Render PR preview or QA host).
+2. Pegasus injects the current user token into the iframe URL.
+3. Frontend extracts the token (priority: `#token=` → `?auth=` → `?access_token=`).
+4. Frontend sends token to `POST /api/auth/iframe` with `credentials: "include"`.
+5. BFF validates token with `GET {PEGASUS_API_URL}/login` using header `Authenticate: <token>`.
+6. BFF stores Pegasus token server-side only and creates a secure HttpOnly session cookie.
+7. Frontend strips the token from the URL via `history.replaceState`.
+8. Reports call `GET {PEGASUS_API_URL}/user/resources` with the stored token to scope destinations.
 
-Tokens are never returned to the frontend, logged, or included in `/healthz`.
+Tokens are never stored in `localStorage`/`sessionStorage`, never logged, and never returned to the frontend after exchange.
 
 ## Development
 
@@ -59,9 +61,10 @@ npm run dev
 
 ### Local iframe auth options
 
-1. Open with query param: `http://localhost:5173/?auth=<pegasus-token>`
-2. Parent `postMessage` with `{ type: "PEGASUS_AUTH", token: "..." }`
-3. Dev-only UI: paste token manually or use dev session when `ALLOW_DEV_SESSION=true`
+1. Preferred hash URL: `http://localhost:5173/#token=<pegasus-token>`
+2. Query alternatives: `?auth=<pegasus-token>` or `?access_token=<pegasus-token>`
+3. Parent `postMessage` with `{ type: "PEGASUS_AUTH", token: "..." }`
+4. Dev-only UI: paste token manually or use dev session when `ALLOW_DEV_SESSION=true`
 
 ```bash
 # Optional dev session (mock scoping, no Pegasus token)
@@ -178,14 +181,29 @@ Report JSON also includes safe `scope.destinationCount`, `scope.matchedMockRows`
 
 Disable `ENABLE_SCOPE_DIAGNOSTICS` when QA is complete.
 
-### Pegasus iframe embedding
+### Pegasus iframe embedding (Render PR preview)
 
-Configure the Pegasus app iframe to load the Render preview URL and pass the user token via:
+Configure the Pegasus app iframe URL to the Render preview host using the Doran pattern:
 
-- URL: `https://<preview>.onrender.com/?auth=<token>`, or
-- `postMessage` from parent with `{ type: "PEGASUS_AUTH", token: "..." }`
+**Preferred:**
+```
+https://<render-preview-host>/#token={{auth}}
+```
 
-The app does **not** use shared service credentials for report scoping.
+**Backward-compatible query alternatives:**
+```
+https://<render-preview-host>/?auth={{auth}}
+https://<render-preview-host>/?access_token={{auth}}
+```
+
+On first load the app exchanges the token once with `POST /api/auth/iframe`, stores it server-side only, and strips it from the address bar.
+
+- No service username/password
+- No OAuth redirect/callback
+- No token in `localStorage`/`sessionStorage`
+- No token logging
+
+Optional parent `postMessage` remains supported for local development.
 
 ### Verify locally (production-like)
 

@@ -89,7 +89,10 @@ export default function IframeAuthBootstrap({ children }) {
   if (authState.phase === 'dev_prompt') {
     return (
       <section className="panel auth-panel">
-        <p>This app expects a Pegasus iframe token via <code>?auth=</code> or parent <code>postMessage</code>.</p>
+        <p>
+          This app expects a Pegasus iframe token via <code>#token=</code>, <code>?auth=</code>,
+          <code>?access_token=</code>, or parent <code>postMessage</code>.
+        </p>
         {isDev && (
           <>
             <form className="dev-token-form" onSubmit={submitManualToken}>

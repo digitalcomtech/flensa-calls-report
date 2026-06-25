@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { validatePegasusToken } from '../auth/pegasusIframeAuth.js';
 import {
-  getPegasusTokenFromUser,
   isDevSessionAllowed,
   isPegasusApiConfigured,
   isProduction,

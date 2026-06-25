@@ -28,9 +28,20 @@ export function getIframeConfig() {
 }
 
 export function exchangeIframeToken(token) {
-  return request('/auth/iframe', {
+  return fetch(`${API_BASE}/auth/iframe`, {
     method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token }),
+  }).then(async (response) => {
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        throw new Error('Could not validate Pegasus session.');
+      }
+      throw new Error(body.error || `Request failed: ${response.status}`);
+    }
+    return response.json();
   });
 }
 
