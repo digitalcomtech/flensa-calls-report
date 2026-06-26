@@ -64,6 +64,28 @@ export function buildSafeScopeDiagnostics(
         path: entry.path,
         count: entry.count,
       })),
+      processTopLevelKeysSeen: [...(scope.triggerDiagnostics.processTopLevelKeysSeen ?? [])],
+      processNestedObjectPathsSeen: (scope.triggerDiagnostics.processNestedObjectPathsSeen ?? []).map((entry) => ({
+        path: entry.path,
+        count: entry.count,
+      })),
+      processNestedArrayPathsSeen: (scope.triggerDiagnostics.processNestedArrayPathsSeen ?? []).map((entry) => ({
+        path: entry.path,
+        count: entry.count,
+      })),
+      processPrimitiveFieldNamesSeen: [...(scope.triggerDiagnostics.processPrimitiveFieldNamesSeen ?? [])],
+      processCandidatePhoneFieldNamesSeen: (
+        scope.triggerDiagnostics.processCandidatePhoneFieldNamesSeen ?? []
+      ).map((entry) => ({
+        path: entry.path,
+        count: entry.count,
+      })),
+      processSampleShapes: (scope.triggerDiagnostics.processSampleShapes ?? []).map((shape) => ({
+        topLevelKeys: [...(shape.topLevelKeys ?? [])],
+        nestedObjectKeys: Object.fromEntries(
+          Object.entries(shape.nestedObjectKeys ?? {}).map(([key, nestedKeys]) => [key, [...nestedKeys]])
+        ),
+      })),
     };
 
     if (scope.triggerHydration) {

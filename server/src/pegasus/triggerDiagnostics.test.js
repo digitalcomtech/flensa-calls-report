@@ -55,6 +55,73 @@ describe('buildTriggerDiagnostics', () => {
     );
     assert.equal(containsFullPhoneNumber(diagnostics), false);
   });
+
+  it('reports hydrated process object shape metadata with keys only', () => {
+    const diagnostics = buildTriggerDiagnostics([
+      {
+        id: 't1',
+        processes: [
+          {
+            command: 'twilio/call',
+            method: 'call',
+            config: {
+              args: { to: '+525512345678' },
+              parameters: { phone: '+525587654321' },
+              destinations: ['+525599988877'],
+            },
+            params: { settings: { phones: ['+525511122233'] } },
+            payload: { data: ['+525544433322'] },
+            data: { phones: ['+525566677788'] },
+          },
+          {
+            handler: 'notify',
+            options: { retry: 2 },
+            properties: { enabled: true },
+          },
+        ],
+      },
+    ]);
+
+    assert.ok(diagnostics.processTopLevelKeysSeen.includes('command'));
+    assert.ok(diagnostics.processTopLevelKeysSeen.includes('config'));
+    assert.ok(diagnostics.processTypeFieldsSeen.includes('command'));
+    assert.ok(diagnostics.processTypeFieldsSeen.includes('handler'));
+    assert.ok(
+      diagnostics.processNestedObjectPathsSeen.some((entry) => entry.path === 'config' && entry.count > 0)
+    );
+    assert.ok(
+      diagnostics.processNestedObjectPathsSeen.some((entry) => entry.path === 'config.args' && entry.count > 0)
+    );
+    assert.ok(
+      diagnostics.processNestedArrayPathsSeen.some((entry) => entry.path === 'config.destinations' && entry.count > 0)
+    );
+    assert.ok(diagnostics.processPrimitiveFieldNamesSeen.includes('options.retry'));
+    assert.ok(
+      diagnostics.processCandidatePhoneFieldNamesSeen.some(
+        (entry) => entry.path === 'config.destinations' && entry.count > 0
+      )
+    );
+    assert.ok(diagnostics.processSampleShapes.length >= 1);
+    assert.ok(diagnostics.processSampleShapes.length <= 5);
+    assert.ok(diagnostics.processSampleShapes[0].topLevelKeys.includes('config'));
+    assert.ok(diagnostics.processSampleShapes[0].nestedObjectKeys.config.includes('args'));
+    assert.equal(containsFullPhoneNumber(diagnostics), false);
+    assert.ok(!JSON.stringify(diagnostics).includes('hidden@example.com'));
+    assert.ok(!JSON.stringify(diagnostics).includes('secret-token'));
+    assert.ok(!JSON.stringify(diagnostics).includes('https://'));
+    assert.ok(!JSON.stringify(diagnostics).includes('+525512345678'));
+  });
+
+  it('limits process sample shapes to five unique layouts', () => {
+    const triggers = Array.from({ length: 8 }, (_, index) => ({
+      id: index,
+      processes: [{ [`field-${index}`]: true, config: { [`slot-${index}`]: true } }],
+    }));
+
+    const diagnostics = buildTriggerDiagnostics(triggers);
+    assert.equal(diagnostics.processSampleShapes.length, 5);
+    assert.ok(diagnostics.processSampleShapes.every((shape) => Array.isArray(shape.topLevelKeys)));
+  });
 });
 
 describe('buildSafeScopeDiagnostics trigger diagnostics gate', () => {
@@ -87,6 +154,8 @@ describe('buildSafeScopeDiagnostics trigger diagnostics gate', () => {
     assert.ok(!('triggerDiagnostics' in compact));
     assert.ok('triggerDiagnostics' in detailed);
     assert.equal(detailed.triggerDiagnostics.sampledTriggerCount, 1);
+    assert.ok(Array.isArray(detailed.triggerDiagnostics.processTopLevelKeysSeen));
+    assert.ok(Array.isArray(detailed.triggerDiagnostics.processSampleShapes));
     assert.equal(containsFullPhoneNumber(detailed.triggerDiagnostics), false);
   });
 });
