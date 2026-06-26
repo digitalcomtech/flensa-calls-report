@@ -162,4 +162,23 @@ describe('extractTwilioDestinations', () => {
 
     assert.deepEqual(result.destinations, ['+525511122233']);
   });
+
+  it('extracts destinations from standalone hydrated process records', () => {
+    const result = extractTwilioDestinations([
+      {
+        id: 'process-1',
+        type: 'twilio/call',
+        config: { destinations: ['+525511111111'] },
+      },
+      {
+        id: 'process-2',
+        params: { to: '+525522222222' },
+        provider: 'twilio',
+        action: 'call',
+      },
+    ]);
+
+    assert.equal(result.destinationCount, 2);
+    assert.deepEqual(result.destinations, ['+525511111111', '+525522222222']);
+  });
 });

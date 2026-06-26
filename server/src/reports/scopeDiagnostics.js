@@ -2,7 +2,39 @@ import { maskDestinations } from '../utils/phoneMask.js';
 
 const FULL_PHONE_PATTERN = /\+?\d{7,}/;
 
+const PROCESS_ITEM_TYPES = ['object', 'string', 'number', 'array', 'null', 'other'];
 const SAMPLE_NESTED_OBJECT_ROOT_KEYS = ['config', 'params', 'settings', 'data', 'payload'];
+
+function mapProcessItemTypesSeen(entries) {
+  const counts = Object.fromEntries(PROCESS_ITEM_TYPES.map((type) => [type, 0]));
+  for (const entry of entries ?? []) {
+    if (entry?.type && entry.type in counts) {
+      counts[entry.type] = entry.count ?? 0;
+    }
+  }
+  return PROCESS_ITEM_TYPES.map((type) => ({ type, count: counts[type] }));
+}
+
+function mapProcessHydrationForApi(source) {
+  if (!source) {
+    return null;
+  }
+
+  return {
+    attempted: Boolean(source.attempted),
+    inputProcessRefCount: source.inputProcessRefCount ?? 0,
+    uniqueProcessIdCount: source.uniqueProcessIdCount ?? 0,
+    hydratedProcessCount: source.hydratedProcessCount ?? 0,
+    method: source.method ?? 'none',
+    endpointTried: source.endpointTried ?? null,
+    httpStatus: source.httpStatus ?? null,
+    candidateStatuses: (source.candidateStatuses ?? []).map((entry) => ({
+      candidate: entry.candidate,
+      httpStatus: entry.httpStatus,
+    })),
+    warnings: [...(source.warnings ?? [])],
+  };
+}
 
 function mapPathCountEntries(entries) {
   return (entries ?? []).map((entry) => ({
@@ -36,6 +68,9 @@ export function normalizeTriggerDiagnosticsForApi(source = {}) {
     processPrimitiveFieldNamesSeen: [...(source.processPrimitiveFieldNamesSeen ?? [])],
     processCandidatePhoneFieldNamesSeen: mapPathCountEntries(source.processCandidatePhoneFieldNamesSeen),
     processSampleShapes: mapProcessSampleShapes(source.processSampleShapes),
+    processItemTypesSeen: mapProcessItemTypesSeen(source.processItemTypesSeen),
+    processRefCount: source.processRefCount ?? 0,
+    processObjectCount: source.processObjectCount ?? 0,
   };
 }
 
@@ -86,21 +121,40 @@ export function buildSafeScopeDiagnostics(
   if (includeTriggerDiagnostics) {
     diagnostics.triggerDiagnostics = normalizeTriggerDiagnosticsForApi(scope.triggerDiagnostics ?? {});
 
-    if (scope.triggerHydration) {
+    if (scope.triggerHydration || scope.processHydration) {
+      const hydration = scope.triggerHydration ?? {
+        attempted: false,
+        inputTriggerRefCount: 0,
+        uniqueTriggerIdCount: 0,
+        hydratedTriggerCount: 0,
+        method: 'none',
+        endpointTried: null,
+        httpStatus: null,
+        candidateStatuses: [],
+        warnings: [],
+      };
+
       diagnostics.triggerHydration = {
-        attempted: Boolean(scope.triggerHydration.attempted),
-        inputTriggerRefCount: scope.triggerHydration.inputTriggerRefCount ?? 0,
-        uniqueTriggerIdCount: scope.triggerHydration.uniqueTriggerIdCount ?? 0,
-        hydratedTriggerCount: scope.triggerHydration.hydratedTriggerCount ?? 0,
-        method: scope.triggerHydration.method ?? 'none',
-        endpointTried: scope.triggerHydration.endpointTried ?? null,
-        httpStatus: scope.triggerHydration.httpStatus ?? null,
-        candidateStatuses: (scope.triggerHydration.candidateStatuses ?? []).map((entry) => ({
+        attempted: Boolean(hydration.attempted),
+        inputTriggerRefCount: hydration.inputTriggerRefCount ?? 0,
+        uniqueTriggerIdCount: hydration.uniqueTriggerIdCount ?? 0,
+        hydratedTriggerCount: hydration.hydratedTriggerCount ?? 0,
+        method: hydration.method ?? 'none',
+        endpointTried: hydration.endpointTried ?? null,
+        httpStatus: hydration.httpStatus ?? null,
+        candidateStatuses: (hydration.candidateStatuses ?? []).map((entry) => ({
           candidate: entry.candidate,
           httpStatus: entry.httpStatus,
         })),
-        warnings: [...(scope.triggerHydration.warnings ?? [])],
+        warnings: [...(hydration.warnings ?? [])],
       };
+
+      const processHydration = mapProcessHydrationForApi(
+        hydration.processHydration ?? scope.processHydration
+      );
+      if (processHydration) {
+        diagnostics.triggerHydration.processHydration = processHydration;
+      }
     }
   }
 

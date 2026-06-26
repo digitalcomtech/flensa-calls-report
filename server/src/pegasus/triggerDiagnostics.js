@@ -1,4 +1,9 @@
 import { containsFullPhoneNumber, normalizeTriggerDiagnosticsForApi } from '../reports/scopeDiagnostics.js';
+import {
+  collectRawProcessItems,
+  isInspectableProcessObject,
+  isProcessRef,
+} from './processDetails.js';
 import { collectProcesses, PROCESS_TYPE_FIELDS } from './triggers.js';
 
 const SAMPLE_LIMIT = 25;
@@ -132,6 +137,35 @@ const DESTINATION_FIELD_PATHS = [
 ];
 
 const PHONE_LIKE_PATTERN = /^\+?\d{7,15}$/;
+
+const PROCESS_ITEM_TYPES = ['object', 'string', 'number', 'array', 'null', 'other'];
+
+function createProcessItemTypeCounts() {
+  return Object.fromEntries(PROCESS_ITEM_TYPES.map((type) => [type, 0]));
+}
+
+function classifyProcessItemType(item) {
+  if (item === null) {
+    return 'null';
+  }
+  if (Array.isArray(item)) {
+    return 'array';
+  }
+  if (typeof item === 'string') {
+    return 'string';
+  }
+  if (typeof item === 'number') {
+    return 'number';
+  }
+  if (isPlainObject(item)) {
+    return 'object';
+  }
+  return 'other';
+}
+
+function mapProcessItemTypeCounts(counts) {
+  return PROCESS_ITEM_TYPES.map((type) => ({ type, count: counts[type] ?? 0 }));
+}
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -414,6 +448,9 @@ export function buildTriggerDiagnostics(triggersInput, { sampleLimit = SAMPLE_LI
   const processCandidatePhoneFieldCounts = new Map();
   const processSampleShapeSignatures = new Set();
   const processSampleShapes = [];
+  const processItemTypeCounts = createProcessItemTypeCounts();
+  let processRefCount = 0;
+  let processObjectCount = 0;
 
   for (const trigger of sampled) {
     if (!isPlainObject(trigger)) {
@@ -445,6 +482,17 @@ export function buildTriggerDiagnostics(triggersInput, { sampleLimit = SAMPLE_LI
       processSampleShapeSignatures,
       processSampleShapes,
     };
+
+    for (const item of collectRawProcessItems(trigger)) {
+      const itemType = classifyProcessItemType(item);
+      processItemTypeCounts[itemType] += 1;
+      if (isProcessRef(item)) {
+        processRefCount += 1;
+      }
+      if (isInspectableProcessObject(item)) {
+        processObjectCount += 1;
+      }
+    }
 
     for (const process of collectProcesses(trigger)) {
       collectProcessTypeValues(process, processTypeValuesSeen, processTypeFieldsSeen);
@@ -480,5 +528,8 @@ export function buildTriggerDiagnostics(triggersInput, { sampleLimit = SAMPLE_LI
     processPrimitiveFieldNamesSeen: [...processPrimitiveFieldNamesSeen].slice(0, VALUE_LIMIT),
     processCandidatePhoneFieldNamesSeen: mapPathCountsToList(processCandidatePhoneFieldCounts),
     processSampleShapes,
+    processItemTypesSeen: mapProcessItemTypeCounts(processItemTypeCounts),
+    processRefCount,
+    processObjectCount,
   });
 }

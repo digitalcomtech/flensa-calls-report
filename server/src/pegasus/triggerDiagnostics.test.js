@@ -112,6 +112,37 @@ describe('buildTriggerDiagnostics', () => {
     assert.ok(!JSON.stringify(diagnostics).includes('+525512345678'));
   });
 
+  it('reports primitive process item types without leaking process ids', () => {
+    const diagnostics = buildTriggerDiagnostics([
+      {
+        id: 't1',
+        processes: [
+          'process-abc-123',
+          42,
+          { id: 'process-def-456' },
+          {
+            command: 'twilio/call',
+            config: { args: { to: '+525512345678' } },
+          },
+        ],
+      },
+    ]);
+
+    assert.ok(
+      diagnostics.processItemTypesSeen.some((entry) => entry.type === 'string' && entry.count > 0)
+    );
+    assert.ok(
+      diagnostics.processItemTypesSeen.some((entry) => entry.type === 'number' && entry.count > 0)
+    );
+    assert.ok(
+      diagnostics.processItemTypesSeen.some((entry) => entry.type === 'object' && entry.count > 0)
+    );
+    assert.equal(diagnostics.processRefCount, 3);
+    assert.equal(diagnostics.processObjectCount, 2);
+    assert.ok(!JSON.stringify(diagnostics).includes('process-abc-123'));
+    assert.ok(!JSON.stringify(diagnostics).includes('process-def-456'));
+  });
+
   it('limits process sample shapes to five unique layouts', () => {
     const triggers = Array.from({ length: 8 }, (_, index) => ({
       id: index,
@@ -138,6 +169,19 @@ describe('normalizeTriggerDiagnosticsForApi', () => {
     assert.deepEqual(normalized.processPrimitiveFieldNamesSeen, []);
     assert.deepEqual(normalized.processCandidatePhoneFieldNamesSeen, []);
     assert.deepEqual(normalized.processSampleShapes, []);
+    assert.deepEqual(
+      normalized.processItemTypesSeen,
+      [
+        { type: 'object', count: 0 },
+        { type: 'string', count: 0 },
+        { type: 'number', count: 0 },
+        { type: 'array', count: 0 },
+        { type: 'null', count: 0 },
+        { type: 'other', count: 0 },
+      ]
+    );
+    assert.equal(normalized.processRefCount, 0);
+    assert.equal(normalized.processObjectCount, 0);
   });
 });
 

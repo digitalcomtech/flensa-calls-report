@@ -1,6 +1,12 @@
 import { getPegasusTokenFromUser, isDevSessionAllowed } from '../env.js';
 import { listUserResources } from './resources.js';
 import { buildTriggerDiagnostics } from './triggerDiagnostics.js';
+import {
+  extractProcessRefsFromTriggers,
+  fetchProcessDetails,
+  mergeHydratedProcessesIntoTriggers,
+  shouldHydrateProcessDetails,
+} from './processDetails.js';
 import { fetchTriggerDetails, shouldHydrateTriggerDetails } from './triggerDetails.js';
 import {
   collectTriggersFromResources,
@@ -125,7 +131,9 @@ export async function resolveUserScope(user) {
   const warnings = [...resourceResult.warnings];
   const normalizedTriggerCount = resourceResult.triggers.length || triggers.length;
   let triggerHydration = null;
+  let processHydration = null;
   let hydratedTriggers = false;
+  let hydratedProcesses = false;
 
   if (shouldHydrateTriggerDetails(triggers, extracted)) {
     const hydration = await fetchTriggerDetails({
@@ -144,8 +152,45 @@ export async function resolveUserScope(user) {
     }
   }
 
+  if (shouldHydrateProcessDetails(triggers, extracted)) {
+    const processRefs = extractProcessRefsFromTriggers(triggers);
+    const hydration = await fetchProcessDetails({
+      token: pegasusToken,
+      processRefs,
+    });
+    processHydration = hydration.diagnostics;
+
+    if (hydration.processes.length > 0) {
+      triggers = mergeHydratedProcessesIntoTriggers(triggers, hydration.processes);
+      hydratedProcesses = true;
+      extracted = extractTwilioDestinations(triggers);
+      warnings.push('hydrated process details');
+    } else if (processHydration.warnings.length > 0) {
+      warnings.push('process detail hydration failed');
+    }
+  }
+
+  if (processHydration) {
+    triggerHydration = {
+      ...(triggerHydration ?? {
+        attempted: false,
+        inputTriggerRefCount: 0,
+        uniqueTriggerIdCount: 0,
+        hydratedTriggerCount: 0,
+        method: 'none',
+        endpointTried: null,
+        httpStatus: null,
+        candidateStatuses: [],
+        warnings: [],
+      }),
+      processHydration,
+    };
+  }
+
   if (extracted.destinationCount === 0) {
-    if (hydratedTriggers) {
+    if (hydratedProcesses) {
+      warnings.push('no twilio/call destinations found in hydrated processes');
+    } else if (hydratedTriggers) {
       warnings.push('no twilio/call destinations found in hydrated triggers');
     } else if (resourceResult.triggers.length > 0) {
       warnings.push('no twilio/call destinations found in triggers');
@@ -166,5 +211,6 @@ export async function resolveUserScope(user) {
     normalization: resourceResult.normalization,
     triggerDiagnostics: buildTriggerDiagnostics(triggers),
     triggerHydration,
+    processHydration,
   };
 }

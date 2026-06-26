@@ -1,4 +1,5 @@
 import { pegasusGet } from './client.js';
+import { hasProcessDetailShape } from './processDetails.js';
 import { normalizePhoneForComparison } from '../utils/phoneMatch.js';
 
 export const PROCESS_TYPE_FIELDS = [
@@ -240,6 +241,34 @@ function extractDestinationsFromTrigger(trigger) {
   return dedupe(numbers);
 }
 
+function looksLikeStandaloneProcess(item) {
+  if (!isPlainObject(item)) {
+    return false;
+  }
+
+  if (
+    Array.isArray(item.processes) ||
+    Array.isArray(item.process) ||
+    Array.isArray(item.actions) ||
+    Array.isArray(item.tasks) ||
+    Array.isArray(item.config?.processes) ||
+    Array.isArray(item.config?.actions) ||
+    Array.isArray(item.config?.tasks)
+  ) {
+    return false;
+  }
+
+  return hasProcessDetailShape(item);
+}
+
+function extractDestinationsFromStandaloneProcess(process) {
+  if (!isTwilioCallProcess(process)) {
+    return [];
+  }
+
+  return destinationsFromProcess(process);
+}
+
 function resolveTriggerId(trigger) {
   if (!isPlainObject(trigger)) {
     return null;
@@ -251,14 +280,29 @@ function resolveTriggerId(trigger) {
  * Extract Twilio call destinations from one or more Pegasus triggers.
  */
 export function extractTwilioDestinations(triggersInput) {
-  const triggers = Array.isArray(triggersInput)
+  const input = Array.isArray(triggersInput)
     ? triggersInput
     : triggersInput
       ? [triggersInput]
       : [];
 
+  const triggers = [];
   const byTrigger = [];
   const all = [];
+
+  for (const item of input) {
+    if (looksLikeStandaloneProcess(item)) {
+      const destinations = extractDestinationsFromStandaloneProcess(item);
+      byTrigger.push({
+        triggerId: null,
+        destinations,
+      });
+      all.push(...destinations);
+      continue;
+    }
+
+    triggers.push(item);
+  }
 
   for (const trigger of triggers) {
     const destinations = extractDestinationsFromTrigger(trigger);
@@ -272,7 +316,7 @@ export function extractTwilioDestinations(triggersInput) {
   const destinations = dedupe(all);
 
   return {
-    triggerCount: triggers.length,
+    triggerCount: input.length,
     destinationCount: destinations.length,
     destinations,
     byTrigger,
