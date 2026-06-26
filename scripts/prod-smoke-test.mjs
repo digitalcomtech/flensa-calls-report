@@ -94,6 +94,14 @@ async function run() {
     assert(frontend.ok, 'GET / serves built frontend');
     assert(html.includes('<div id="root">'), 'frontend HTML contains React mount point');
 
+    const scriptMatch = html.match(/src="(\/assets\/[^"]+\.js)"/);
+    assert(scriptMatch, 'frontend HTML references a built JS bundle');
+    const bundle = await fetch(`${BASE}${scriptMatch[1]}`);
+    const bundleSource = await bundle.text();
+    assert(bundle.ok, 'built JS bundle is served');
+    assert(!bundleSource.includes('Cerrar sesión'), 'built UI does not render logout button text');
+    assert(!bundleSource.includes('Pegasus User'), 'built UI does not render session user label');
+
     const assetProbe = await fetch(`${BASE}/assets/`);
     assert(assetProbe.status === 200 || assetProbe.status === 404, 'non-API routes do not return API JSON errors');
 

@@ -11,41 +11,10 @@ body {
   color: #1a1a1a;
 }
 
-.header {
-  background: #0f172a;
-  color: #fff;
-}
-
-.header-inner {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 1rem 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.header h1 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.user-name {
-  opacity: 0.85;
-  font-size: 0.9rem;
-}
-
 .main {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 0.75rem 1.5rem 1.5rem;
 }
 
 .panel {
@@ -487,7 +456,6 @@ th {
   }
 
   .no-print,
-  .header,
   .panel,
   .config-panel,
   .report-tabs,

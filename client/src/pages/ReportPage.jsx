@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { getCallsReport } from '../api/reportClient.js';
 import ReportConfigPanel from '../components/ReportConfigPanel.jsx';
 import DetallesTab from '../components/DetallesTab.jsx';
-import Header from '../components/Header.jsx';
 import IframeAuthBootstrap from '../components/IframeAuthBootstrap.jsx';
 import ReportTabs from '../components/ReportTabs.jsx';
 import ResumenTab from '../components/ResumenTab.jsx';
@@ -15,7 +14,7 @@ function defaultTo() {
   return '2026-06-23';
 }
 
-function ReportContent({ user }) {
+function ReportContent() {
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
   const [report, setReport] = useState(null);
@@ -41,7 +40,6 @@ function ReportContent({ user }) {
 
   return (
     <div className="app">
-      <Header user={user} />
       <main className="main">
         <ReportConfigPanel
           from={from}
@@ -72,5 +70,5 @@ function ReportContent({ user }) {
 }
 
 export default function ReportPage() {
-  return <IframeAuthBootstrap>{({ user }) => <ReportContent user={user} />}</IframeAuthBootstrap>;
+  return <IframeAuthBootstrap>{() => <ReportContent />}</IframeAuthBootstrap>;
 }
