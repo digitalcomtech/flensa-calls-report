@@ -2,19 +2,19 @@ import { logout } from '../api/authClient.js';
 
 export default function Header({ user }) {
   return (
-    <header className="header">
+    <header className="header no-print">
       <div className="header-inner">
-        <h1>Flensa Calls Report</h1>
+        <h1>Reportes</h1>
         <div className="header-actions">
           {user ? (
             <>
               <span className="user-name">{user.name || user.email}</span>
               <button type="button" onClick={() => logout().then(() => window.location.reload())}>
-                Log out
+                Cerrar sesión
               </button>
             </>
           ) : (
-            <span className="user-name">Not signed in</span>
+            <span className="user-name">Sin sesión</span>
           )}
         </div>
       </div>

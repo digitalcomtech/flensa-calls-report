@@ -2,7 +2,7 @@ export default function DateRangeFilter({ from, to, onChange, onSubmit, loading 
   return (
     <form className="filter-form" onSubmit={onSubmit}>
       <label>
-        From
+        Desde
         <input
           type="date"
           value={from}
@@ -10,7 +10,7 @@ export default function DateRangeFilter({ from, to, onChange, onSubmit, loading 
         />
       </label>
       <label>
-        To
+        Hasta
         <input
           type="date"
           value={to}
@@ -18,7 +18,7 @@ export default function DateRangeFilter({ from, to, onChange, onSubmit, loading 
         />
       </label>
       <button type="submit" disabled={loading}>
-        {loading ? 'Loading…' : 'Run report'}
+        {loading ? 'Cargando…' : 'Generar reporte'}
       </button>
     </form>
   );

@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { exportCallsUrl, getCallsReport } from '../api/reportClient.js';
-import CallsSummary from '../components/CallsSummary.jsx';
-import CallsTable from '../components/CallsTable.jsx';
+import { getCallsReport } from '../api/reportClient.js';
 import DateRangeFilter from '../components/DateRangeFilter.jsx';
+import DetallesTab from '../components/DetallesTab.jsx';
 import Header from '../components/Header.jsx';
 import IframeAuthBootstrap from '../components/IframeAuthBootstrap.jsx';
+import ReportTabs from '../components/ReportTabs.jsx';
+import ResumenTab from '../components/ResumenTab.jsx';
 
 function defaultFrom() {
   return '2026-06-20';
@@ -18,6 +19,7 @@ function ReportContent({ user }) {
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
   const [report, setReport] = useState(null);
+  const [activeTab, setActiveTab] = useState('resumen');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -28,6 +30,7 @@ function ReportContent({ user }) {
     try {
       const data = await getCallsReport({ from, to });
       setReport(data);
+      setActiveTab('resumen');
     } catch (err) {
       setError(err.message);
       setReport(null);
@@ -40,31 +43,30 @@ function ReportContent({ user }) {
     <div className="app">
       <Header user={user} />
       <main className="main">
-        <section className="panel">
+        <section className="panel no-print">
           <DateRangeFilter
             from={from}
             to={to}
             loading={loading}
-            onChange={({ from: f, to: t }) => {
-              setFrom(f);
-              setTo(t);
+            onChange={({ from: nextFrom, to: nextTo }) => {
+              setFrom(nextFrom);
+              setTo(nextTo);
             }}
             onSubmit={runReport}
           />
-          {report && (
-            <a className="button secondary" href={exportCallsUrl({ from, to })} download>
-              Export CSV
-            </a>
-          )}
         </section>
 
         {error && <p className="error">{error}</p>}
 
         {report && (
-          <>
-            <CallsSummary summary={report.summary} />
-            <CallsTable calls={report.calls} />
-          </>
+          <section className="report-shell">
+            <ReportTabs activeTab={activeTab} onTabChange={setActiveTab} />
+            {activeTab === 'resumen' ? (
+              <ResumenTab report={report} from={from} to={to} />
+            ) : (
+              <DetallesTab calls={report.calls} from={from} to={to} />
+            )}
+          </section>
         )}
       </main>
     </div>
