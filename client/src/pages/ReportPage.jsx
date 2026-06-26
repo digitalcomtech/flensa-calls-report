@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getCallsReport } from '../api/reportClient.js';
-import DateRangeFilter from '../components/DateRangeFilter.jsx';
+import ReportConfigPanel from '../components/ReportConfigPanel.jsx';
 import DetallesTab from '../components/DetallesTab.jsx';
 import Header from '../components/Header.jsx';
 import IframeAuthBootstrap from '../components/IframeAuthBootstrap.jsx';
@@ -43,18 +43,16 @@ function ReportContent({ user }) {
     <div className="app">
       <Header user={user} />
       <main className="main">
-        <section className="panel no-print">
-          <DateRangeFilter
-            from={from}
-            to={to}
-            loading={loading}
-            onChange={({ from: nextFrom, to: nextTo }) => {
-              setFrom(nextFrom);
-              setTo(nextTo);
-            }}
-            onSubmit={runReport}
-          />
-        </section>
+        <ReportConfigPanel
+          from={from}
+          to={to}
+          loading={loading}
+          onChange={({ from: nextFrom, to: nextTo }) => {
+            setFrom(nextFrom);
+            setTo(nextTo);
+          }}
+          onSubmit={runReport}
+        />
 
         {error && <p className="error">{error}</p>}
 

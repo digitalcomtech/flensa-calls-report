@@ -2,7 +2,13 @@
 
 Fase 1 calls-only report for Flensa Mx. React + Vite frontend, Express BFF backend, read-only operations.
 
-**Scope:** Twilio calls for destination numbers derived from the authenticated user's Pegasus resources/triggers. No alert correlation, vehicle info, or group hard-coding in Fase 1.
+**Scope:** Twilio calls for destination numbers derived from the authenticated user's Pegasus resources/triggers. No alert correlation, vehicle info, group filtering, report scheduling, or partial-hour time windows in Fase 1.
+
+### Fase 1 date and time range
+
+- The configuration screen exposes **Fechas** (`from` / `to`) and a read-only **Rango horario** fixed at `00:00 - 23:59`.
+- The API accepts date-only query params (`YYYY-MM-DD`). The BFF normalizes each day to full UTC bounds: `{from}T00:00:00.000Z` through `{to}T23:59:59.999Z` (see `server/src/reports/dateRange.js`).
+- Partial-hour filtering, group selectors, report preview, and scheduled delivery are intentionally omitted from Fase 1 UI and API.
 
 This app is designed to run **inside Pegasus as an iframe**. Authentication uses the Pegasus user token handed into the app — not a shared service username/password and not OAuth redirects.
 

@@ -1,5 +1,4 @@
-const PHASE_WARNING_TEXT =
-  'Primera fase: este reporte no relaciona alertas. El universo del reporte son únicamente las llamadas realizadas en el rango de fechas y horario seleccionado. En una segunda fase se podría agregar la relación llamada-alerta.';
+import { PHASE_WARNING_TEXT } from '../constants/reportConfig.js';
 
 export default function PhaseWarningBanner() {
   return (

@@ -53,11 +53,153 @@ body {
   border-radius: 8px;
   padding: 1.25rem;
   margin-bottom: 1rem;
+}
+
+.config-panel {
+  background: #fff;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.config-page-header {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 1rem 1.5rem;
+}
+
+.config-page-title {
+  color: #1d4ed8;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.config-page-subtitle {
+  color: #64748b;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  margin: 0.35rem 0 0;
+  max-width: 52rem;
+}
+
+.config-panel-body {
+  display: grid;
+  gap: 1.5rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .config-panel-body {
+    grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.2fr);
+    align-items: start;
+  }
+}
+
+.report-identity {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
   gap: 1rem;
+}
+
+.report-identity-icon {
+  align-items: center;
+  background: #92400e;
+  border-radius: 8px;
+  color: #fff;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 56px;
+  justify-content: center;
+  width: 56px;
+}
+
+.report-identity-title {
+  color: #1d4ed8;
+  font-size: 1.35rem;
+  margin: 0 0 0.5rem;
+}
+
+.report-identity-description {
+  color: #475569;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.config-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.config-label {
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.date-range-inputs {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.date-range-separator {
+  color: #94a3b8;
+}
+
+.config-field input,
+.config-field select {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.time-range-select:disabled {
+  background: #f8fafc;
+  color: #475569;
+  cursor: not-allowed;
+}
+
+.field-hint {
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.config-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.button-primary {
+  background: #2563eb;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.65rem 1.25rem;
+  text-transform: uppercase;
+}
+
+.button-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .filter-form {
@@ -347,6 +489,7 @@ th {
   .no-print,
   .header,
   .panel,
+  .config-panel,
   .report-tabs,
   .report-toolbar,
   .table-toolbar,
