@@ -1,5 +1,9 @@
 import { env } from '../env.js';
-import { formatTwilioDateParam } from '../reports/dateRange.js';
+import {
+  buildReportDateBounds,
+  filterCallsByDateRange,
+  formatTwilioDateParam,
+} from '../reports/dateRange.js';
 import { filterCallsByScopedDestinations } from '../utils/phoneMatch.js';
 
 const TWILIO_API_BASE = 'https://api.twilio.com/2010-04-01';
@@ -45,6 +49,20 @@ export function buildTwilioAuthHeader(apiKeySid, apiKeySecret) {
   return `Basic ${encoded}`;
 }
 
+export function buildTwilioCallsQueryString({ from, to, pageSize = DEFAULT_PAGE_SIZE } = {}) {
+  const parts = [`PageSize=${encodeURIComponent(String(pageSize))}`];
+
+  if (from) {
+    parts.push(`StartTime>=${encodeURIComponent(formatTwilioDateParam(from))}`);
+  }
+
+  if (to) {
+    parts.push(`StartTime<=${encodeURIComponent(formatTwilioDateParam(to))}`);
+  }
+
+  return parts.join('&');
+}
+
 export function buildTwilioCallsQueryParams({ from, to, pageSize = DEFAULT_PAGE_SIZE } = {}) {
   const params = new URLSearchParams();
   params.set('PageSize', String(pageSize));
@@ -68,8 +86,8 @@ export function buildTwilioCallsUrl({ accountSid, from, to, pageSize = DEFAULT_P
     return `https://api.twilio.com${nextPageUri}`;
   }
 
-  const query = buildTwilioCallsQueryParams({ from, to, pageSize });
-  return `${TWILIO_API_BASE}/Accounts/${accountSid}/Calls.json?${query.toString()}`;
+  const query = buildTwilioCallsQueryString({ from, to, pageSize });
+  return `${TWILIO_API_BASE}/Accounts/${accountSid}/Calls.json?${query}`;
 }
 
 export function mapTwilioCallToDetail(call) {
@@ -78,6 +96,17 @@ export function mapTwilioCallToDetail(call) {
     destination: call.to ?? '',
     duration: Number(call.duration) || 0,
     status: call.status ?? 'unknown',
+  };
+}
+
+export function buildTwilioDateFilterMeta(bounds, { rowsBeforeDateFilter, rowsAfterDateFilter }) {
+  return {
+    requestedFrom: bounds.requestedFrom,
+    requestedTo: bounds.requestedTo,
+    fromInclusive: bounds.fromInclusive.toISOString(),
+    toInclusive: bounds.toInclusive.toISOString(),
+    rowsBeforeDateFilter,
+    rowsAfterDateFilter,
   };
 }
 
@@ -103,17 +132,34 @@ async function fetchTwilioCallsPage(url, authHeader, fetchImpl = fetch) {
   return response.json();
 }
 
-export async function fetchTwilioCalls({ from, to, destinations = [], pageSize = DEFAULT_PAGE_SIZE, fetchImpl = fetch } = {}) {
+export async function fetchTwilioCalls({
+  from,
+  to,
+  destinations = [],
+  dateBounds,
+  pageSize = DEFAULT_PAGE_SIZE,
+  fetchImpl = fetch,
+} = {}) {
   if (!Array.isArray(destinations) || destinations.length === 0) {
-    return [];
+    return {
+      calls: [],
+      dateFilter: null,
+      invalidStartTimeCount: 0,
+    };
   }
 
   assertTwilioConfigured();
 
+  const bounds = dateBounds ?? buildReportDateBounds(from, to);
   const { accountSid, apiKeySid, apiKeySecret } = getTwilioCredentials();
   const authHeader = buildTwilioAuthHeader(apiKeySid, apiKeySecret);
   const collected = [];
-  let nextUrl = buildTwilioCallsUrl({ accountSid, from, to, pageSize });
+  let nextUrl = buildTwilioCallsUrl({
+    accountSid,
+    from: bounds.requestedFrom,
+    to: bounds.requestedTo,
+    pageSize,
+  });
 
   while (nextUrl) {
     const payload = await fetchTwilioCallsPage(nextUrl, authHeader, fetchImpl);
@@ -122,5 +168,12 @@ export async function fetchTwilioCalls({ from, to, destinations = [], pageSize =
     nextUrl = payload.next_page_uri ? buildTwilioCallsUrl({ nextPageUri: payload.next_page_uri }) : null;
   }
 
-  return filterCallsByScopedDestinations(collected, destinations);
+  const dateFilterResult = filterCallsByDateRange(collected, bounds);
+  const destinationFiltered = filterCallsByScopedDestinations(dateFilterResult.calls, destinations);
+
+  return {
+    calls: destinationFiltered,
+    invalidStartTimeCount: dateFilterResult.invalidStartTimeCount,
+    dateFilter: buildTwilioDateFilterMeta(bounds, dateFilterResult),
+  };
 }

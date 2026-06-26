@@ -7,6 +7,7 @@ import {
   assertTwilioConfigured,
   buildTwilioAuthHeader,
   buildTwilioCallsQueryParams,
+  buildTwilioCallsQueryString,
   buildTwilioCallsUrl,
   fetchTwilioCalls,
   mapTwilioCallToDetail,
@@ -120,14 +121,23 @@ describe('twilio calls client', () => {
     assert.equal(params.get('StartTime>='), '2026-06-20');
     assert.equal(params.get('StartTime<='), '2026-06-23');
 
+    const query = buildTwilioCallsQueryString({
+      from: '2026-06-20',
+      to: '2026-06-23',
+    });
+    assert.match(query, /StartTime>=2026-06-20/);
+    assert.match(query, /StartTime<=2026-06-23/);
+
     const url = buildTwilioCallsUrl({
       accountSid: 'AC123',
       from: '2026-06-20',
       to: '2026-06-23',
     });
 
-    assert.match(url, /StartTime%3E%3D=2026-06-20/);
-    assert.match(url, /StartTime%3C%3D=2026-06-23/);
+    assert.match(url, /StartTime>=2026-06-20/);
+    assert.match(url, /StartTime<=2026-06-23/);
+    assert.ok(!url.includes('Authenticate'));
+    assert.ok(!url.includes('super-secret'));
   });
 
   it('follows next_page_uri pagination and filters scoped destinations', async () => {
@@ -145,7 +155,7 @@ describe('twilio calls client', () => {
       };
     };
 
-    const calls = await fetchTwilioCalls({
+    const { calls } = await fetchTwilioCalls({
       from: '2026-06-20',
       to: '2026-06-23',
       destinations: ['+525512345678', '+525587654321'],
@@ -153,6 +163,8 @@ describe('twilio calls client', () => {
     });
 
     assert.equal(requestedUrls.length, 2);
+    assert.ok(requestedUrls[0].includes('StartTime>=2026-06-20'));
+    assert.ok(requestedUrls[0].includes('StartTime<=2026-06-23'));
     assert.ok(requestedUrls[1].includes('PageToken=abc'));
     assert.equal(calls.length, 3);
     assert.ok(calls.every((call) => phonesMatch(call.destination, '+525512345678') || phonesMatch(call.destination, '+525587654321')));
@@ -162,12 +174,79 @@ describe('twilio calls client', () => {
     assert.equal(isNotAnsweredCall('busy'), true);
   });
 
+  it('filters out-of-range rows before destination matching', async () => {
+    previousEnv = saveTwilioEnv();
+    setTwilioEnv();
+
+    const fetchImpl = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        calls: [
+          {
+            sid: 'CA-old',
+            to: '+525512345678',
+            status: 'completed',
+            start_time: '2026-06-19T12:00:00.000Z',
+            duration: '10',
+          },
+          {
+            sid: 'CA-in-1',
+            to: '+525512345678',
+            status: 'completed',
+            start_time: '2026-06-20T12:00:00.000Z',
+            duration: '10',
+          },
+          {
+            sid: 'CA-in-2',
+            to: '+525512345678',
+            status: 'completed',
+            start_time: 'Fri, 23 Jun 2026 11:00:00 +0000',
+            duration: '10',
+          },
+          {
+            sid: 'CA-new',
+            to: '+525512345678',
+            status: 'completed',
+            start_time: 'Fri, 26 Jun 2026 15:12:57 +0000',
+            duration: '10',
+          },
+          {
+            sid: 'CA-bad',
+            to: '+525512345678',
+            status: 'completed',
+            start_time: 'not-a-date',
+            duration: '10',
+          },
+        ],
+        next_page_uri: null,
+      }),
+    });
+
+    const { calls, dateFilter, invalidStartTimeCount } = await fetchTwilioCalls({
+      from: '2026-06-20',
+      to: '2026-06-23',
+      destinations: ['+525512345678'],
+      fetchImpl,
+    });
+
+    assert.equal(dateFilter.rowsBeforeDateFilter, 5);
+    assert.equal(dateFilter.rowsAfterDateFilter, 2);
+    assert.equal(invalidStartTimeCount, 1);
+    assert.equal(calls.length, 2);
+    assert.equal(dateFilter.requestedFrom, '2026-06-20');
+    assert.equal(dateFilter.requestedTo, '2026-06-23');
+    assert.equal(dateFilter.fromInclusive, '2026-06-20T00:00:00.000Z');
+    assert.equal(dateFilter.toInclusive, '2026-06-23T23:59:59.999Z');
+    assert.ok(!calls.some((call) => String(call.dateTime).includes('26 Jun 2026')));
+  });
+
   it('returns empty results without querying Twilio when destinations are empty', async () => {
     previousEnv = saveTwilioEnv();
     setTwilioEnv();
 
     let fetchCount = 0;
-    const calls = await fetchTwilioCalls({
+    const { calls } = await fetchTwilioCalls({
       from: '2026-06-20',
       to: '2026-06-23',
       destinations: [],
@@ -233,5 +312,48 @@ describe('twilio report summary and export parity', () => {
     assert.match(csv, /2026-06-20T14:30:00.000Z/);
     assert.match(csv, /\+525512345678/);
     assert.match(csv, /no-answer/);
+  });
+
+  it('excludes out-of-range rows from CSV export after date filtering', async () => {
+    const previousEnv = saveTwilioEnv();
+    setTwilioEnv();
+
+    try {
+      const { calls } = await fetchTwilioCalls({
+        from: '2026-06-20',
+        to: '2026-06-23',
+        destinations: ['+525512345678'],
+        fetchImpl: async () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            calls: [
+              {
+                sid: 'CA-in',
+                to: '+525512345678',
+                status: 'completed',
+                start_time: '2026-06-20T12:00:00.000Z',
+                duration: '10',
+              },
+              {
+                sid: 'CA-out',
+                to: '+525512345678',
+                status: 'completed',
+                start_time: 'Fri, 26 Jun 2026 15:12:57 +0000',
+                duration: '10',
+              },
+            ],
+            next_page_uri: null,
+          }),
+        }),
+      });
+
+      const csv = callsToCsv(calls);
+      assert.equal(calls.length, 1);
+      assert.match(csv, /2026-06-20T12:00:00.000Z/);
+      assert.ok(!csv.includes('26 Jun 2026'));
+    } finally {
+      restoreTwilioEnv(previousEnv);
+    }
   });
 });

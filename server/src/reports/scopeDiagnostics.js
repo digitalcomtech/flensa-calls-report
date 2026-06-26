@@ -200,7 +200,7 @@ export function buildSafeScopeDiagnostics(
   return diagnostics;
 }
 
-export function buildSafeReportScopeMeta(scope, matchedRows, { source = 'mock' } = {}) {
+export function buildSafeReportScopeMeta(scope, matchedRows, { source = 'mock', twilioDateFilter } = {}) {
   const meta = {
     destinationCount: scope.destinationCount ?? 0,
     warnings: [...(scope.warnings ?? [])],
@@ -208,6 +208,16 @@ export function buildSafeReportScopeMeta(scope, matchedRows, { source = 'mock' }
 
   if (source === 'twilio') {
     meta.matchedTwilioRows = matchedRows;
+    if (twilioDateFilter) {
+      meta.twilioDateFilter = {
+        requestedFrom: twilioDateFilter.requestedFrom,
+        requestedTo: twilioDateFilter.requestedTo,
+        fromInclusive: twilioDateFilter.fromInclusive,
+        toInclusive: twilioDateFilter.toInclusive,
+        rowsBeforeDateFilter: twilioDateFilter.rowsBeforeDateFilter ?? 0,
+        rowsAfterDateFilter: twilioDateFilter.rowsAfterDateFilter ?? 0,
+      };
+    }
   } else {
     meta.matchedMockRows = matchedRows;
   }

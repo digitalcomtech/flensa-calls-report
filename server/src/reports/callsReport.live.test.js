@@ -108,8 +108,75 @@ describe('buildLiveTwilioCallsReport', () => {
     assert.equal(report.summary.notAnswered.count, 1);
     assert.equal(report.scope.matchedTwilioRows, 2);
     assert.equal(report.scope.destinationCount, 2);
+    assert.equal(report.scope.twilioDateFilter?.requestedFrom, '2026-06-20');
+    assert.equal(report.scope.twilioDateFilter?.requestedTo, '2026-06-23');
+    assert.equal(report.scope.twilioDateFilter?.fromInclusive, '2026-06-20T00:00:00.000Z');
+    assert.equal(report.scope.twilioDateFilter?.toInclusive, '2026-06-23T23:59:59.999Z');
     assert.equal(containsFullPhoneNumber(report.scope), false);
     assert.ok(!('matchedMockRows' in report.scope));
+  });
+
+  it('excludes out-of-range Twilio rows before summary and matchedTwilioRows', async () => {
+    previousEnv = saveEnv([...TWILIO_ENV_KEYS, 'USE_MOCK_REPORT']);
+    process.env.TWILIO_ACCOUNT_SID = 'AC123';
+    process.env.TWILIO_API_KEY_SID = 'SK123';
+    process.env.TWILIO_API_KEY_SECRET = 'super-secret-value';
+    originalFetch = global.fetch;
+    global.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        calls: [
+          {
+            sid: 'CA-in-20',
+            to: '+525512345678',
+            status: 'completed',
+            start_time: '2026-06-20T14:30:00.000Z',
+            duration: '42',
+          },
+          {
+            sid: 'CA-in-23',
+            to: '+525512345678',
+            status: 'completed',
+            start_time: 'Fri, 23 Jun 2026 11:00:00 +0000',
+            duration: '10',
+          },
+          {
+            sid: 'CA-out',
+            to: '+525512345678',
+            status: 'completed',
+            start_time: 'Fri, 26 Jun 2026 15:12:57 +0000',
+            duration: '10',
+          },
+          {
+            sid: 'CA-bad',
+            to: '+525512345678',
+            status: 'completed',
+            start_time: 'invalid-date',
+            duration: '10',
+          },
+        ],
+        next_page_uri: null,
+      }),
+    });
+
+    const report = await buildLiveTwilioCallsReport({
+      from: '2026-06-20',
+      to: '2026-06-23',
+      scope: {
+        destinationCount: 1,
+        destinations: ['+525512345678'],
+        warnings: [],
+      },
+    });
+
+    assert.equal(report.calls.length, 2);
+    assert.equal(report.summary.totalCalls, 2);
+    assert.equal(report.scope.matchedTwilioRows, 2);
+    assert.equal(report.scope.twilioDateFilter?.rowsBeforeDateFilter, 4);
+    assert.equal(report.scope.twilioDateFilter?.rowsAfterDateFilter, 2);
+    assert.ok(report.scope.warnings.includes('excluded twilio calls with invalid start_time'));
+    assert.ok(!report.calls.some((call) => String(call.dateTime).includes('26 Jun 2026')));
   });
 });
 
