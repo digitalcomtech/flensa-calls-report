@@ -1,9 +1,14 @@
 import { containsFullPhoneNumber, normalizeTriggerDiagnosticsForApi } from '../reports/scopeDiagnostics.js';
 import {
   collectRawProcessItems,
-  isInspectableProcessObject,
   isProcessRef,
 } from './processDetails.js';
+import {
+  createArrayProcessDiagnosticsState,
+  finalizeArrayProcessDiagnostics,
+  inspectArrayProcessEntry,
+  isInspectableProcessObject,
+} from './processArrayShape.js';
 import { collectProcesses, PROCESS_TYPE_FIELDS } from './triggers.js';
 
 const SAMPLE_LIMIT = 25;
@@ -449,6 +454,7 @@ export function buildTriggerDiagnostics(triggersInput, { sampleLimit = SAMPLE_LI
   const processSampleShapeSignatures = new Set();
   const processSampleShapes = [];
   const processItemTypeCounts = createProcessItemTypeCounts();
+  const arrayDiagnosticsState = createArrayProcessDiagnosticsState();
   let processRefCount = 0;
   let processObjectCount = 0;
 
@@ -492,6 +498,9 @@ export function buildTriggerDiagnostics(triggersInput, { sampleLimit = SAMPLE_LI
       if (isInspectableProcessObject(item)) {
         processObjectCount += 1;
       }
+      if (Array.isArray(item)) {
+        inspectArrayProcessEntry(item, arrayDiagnosticsState);
+      }
     }
 
     for (const process of collectProcesses(trigger)) {
@@ -504,6 +513,8 @@ export function buildTriggerDiagnostics(triggersInput, { sampleLimit = SAMPLE_LI
       }
     }
   }
+
+  const arrayDiagnostics = finalizeArrayProcessDiagnostics(arrayDiagnosticsState);
 
   return normalizeTriggerDiagnosticsForApi({
     sampledTriggerCount: sampled.length,
@@ -531,5 +542,6 @@ export function buildTriggerDiagnostics(triggersInput, { sampleLimit = SAMPLE_LI
     processItemTypesSeen: mapProcessItemTypeCounts(processItemTypeCounts),
     processRefCount,
     processObjectCount,
+    ...arrayDiagnostics,
   });
 }

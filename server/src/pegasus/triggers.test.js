@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { extractTwilioDestinations } from './triggers.js';
+import { extractProcessIdFromRef } from './processArrayShape.js';
 
 describe('extractTwilioDestinations', () => {
   it('extracts multiple destinations from process.config.destinations', () => {
@@ -181,4 +182,27 @@ describe('extractTwilioDestinations', () => {
     assert.equal(result.destinationCount, 2);
     assert.deepEqual(result.destinations, ['+525511111111', '+525522222222']);
   });
+
+  it('extracts destinations from array-shaped process entries', () => {
+    const result = extractTwilioDestinations({
+      id: 't-array',
+      processes: [
+        ['process-id-1', 'twilio/call', { destinations: ['+525511111111'] }],
+        ['twilio/call', { to: '+525522222222' }],
+        ['twilio', 'call', { config: { destinations: ['+525533333333'] } }],
+      ],
+    });
+
+    assert.equal(result.destinationCount, 3);
+  });
+
+  it('extracts destinations from single-element process id arrays after hydration shape', () => {
+    const result = extractTwilioDestinations({
+      id: 't-ref',
+      processes: [['process-only-ref']],
+    });
+    assert.equal(result.destinationCount, 0);
+    assert.equal(extractProcessIdFromRef(['process-only-ref']), 'process-only-ref');
+  });
 });
+

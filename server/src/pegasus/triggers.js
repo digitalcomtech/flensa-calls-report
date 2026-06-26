@@ -1,5 +1,5 @@
 import { pegasusGet } from './client.js';
-import { hasProcessDetailShape } from './processDetails.js';
+import { hasProcessDetailShape, normalizeProcessItem } from './processArrayShape.js';
 import { normalizePhoneForComparison } from '../utils/phoneMatch.js';
 
 export const PROCESS_TYPE_FIELDS = [
@@ -14,8 +14,17 @@ export const PROCESS_TYPE_FIELDS = [
   'processType',
 ];
 
-const TWILIO_PROVIDER_FIELDS = ['service', 'provider', 'plugin'];
-const CALL_LABEL_FIELDS = ['action', 'name', 'type', 'key', 'process_type', 'processType'];
+const TWILIO_PROVIDER_FIELDS = [
+  'type',
+  'name',
+  'key',
+  'service',
+  'provider',
+  'plugin',
+  'command',
+  'method',
+];
+const CALL_LABEL_FIELDS = ['action', 'name', 'type', 'key', 'process_type', 'processType', 'command', 'method'];
 const PHONE_PATTERN = /^\+?\d{7,15}$/;
 
 const DESTINATION_PATHS = [
@@ -202,25 +211,30 @@ export function collectProcesses(trigger) {
 
   const processes = [];
 
-  const addArray = (items) => {
-    if (Array.isArray(items)) {
-      processes.push(...items.filter((item) => isPlainObject(item)));
+  const addItem = (item) => {
+    const normalized = normalizeProcessItem(item);
+    if (normalized) {
+      processes.push(normalized);
     }
   };
 
-  const addObject = (item) => {
-    if (isPlainObject(item)) {
-      processes.push(item);
+  const addArray = (items) => {
+    if (Array.isArray(items)) {
+      for (const item of items) {
+        addItem(item);
+      }
     }
   };
 
   addArray(trigger.processes);
   addArray(trigger.process);
-  addObject(Array.isArray(trigger.process) ? null : trigger.process);
+  if (!Array.isArray(trigger.process)) {
+    addItem(trigger.process);
+  }
   addArray(trigger.actions);
   addArray(trigger.tasks);
   addArray(trigger.config?.processes);
-  addObject(trigger.config?.process);
+  addItem(trigger.config?.process);
   addArray(trigger.config?.actions);
   addArray(trigger.config?.tasks);
 

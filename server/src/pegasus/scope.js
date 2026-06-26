@@ -152,6 +152,8 @@ export async function resolveUserScope(user) {
     }
   }
 
+  let triggersForDiagnostics = triggers;
+
   if (shouldHydrateProcessDetails(triggers, extracted)) {
     const processRefs = extractProcessRefsFromTriggers(triggers);
     const hydration = await fetchProcessDetails({
@@ -209,7 +211,7 @@ export async function resolveUserScope(user) {
     warnings,
     resourceShape: resourceResult.shape,
     normalization: resourceResult.normalization,
-    triggerDiagnostics: buildTriggerDiagnostics(triggers),
+    triggerDiagnostics: buildTriggerDiagnostics(triggersForDiagnostics),
     triggerHydration,
     processHydration,
   };

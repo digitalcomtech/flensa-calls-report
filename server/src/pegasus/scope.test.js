@@ -196,11 +196,70 @@ describe('resolveUserScope', () => {
       assert.equal(scope.processHydration?.inputProcessRefCount, 2);
       assert.ok(
         scope.triggerDiagnostics.processItemTypesSeen.some(
-          (entry) => entry.type === 'object' && entry.count > 0
+          (entry) => entry.type === 'string' && entry.count === 2
         )
       );
-      assert.ok(scope.triggerDiagnostics.processTopLevelKeysSeen.includes('type'));
-      assert.equal(scope.triggerDiagnostics.processRefCount, 0);
+      assert.equal(scope.triggerDiagnostics.processRefCount, 2);
+      assert.equal(containsFullPhoneNumber(scope.triggerDiagnostics), false);
+      assert.ok(!JSON.stringify(scope).includes('process-1'));
+    } finally {
+      fetchMock.mock.restore();
+    }
+  });
+
+  it('hydrates array-shaped process refs and extracts destinations from hydrated process details', async () => {
+    const fetchMock = mock.method(global, 'fetch', async (url, options = {}) => {
+      const target = String(url);
+      assert.equal(options.headers?.Authenticate, 'pegasus-token');
+
+      if (target.endsWith('/user/resources')) {
+        return pegasusJsonResponse({
+          triggers: [{ id: 'trigger-1' }],
+        });
+      }
+
+      if (target.includes('/triggers?') && !target.includes('/api/triggers')) {
+        return pegasusJsonResponse({
+          data: [
+            {
+              id: 'trigger-1',
+              processes: [['process-1'], ['process-2']],
+            },
+          ],
+        });
+      }
+
+      if (target.includes('/processes?') && !target.includes('/api/processes')) {
+        return pegasusJsonResponse({
+          data: [
+            {
+              id: 'process-1',
+              type: 'twilio/call',
+              config: { destinations: ['+525511111111'] },
+            },
+            {
+              id: 'process-2',
+              type: 'twilio/call',
+              config: { destinations: ['+525522222222'] },
+            },
+          ],
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${target}`);
+    });
+
+    try {
+      const scope = await resolveUserScope({
+        id: 'user-1',
+        pegasusToken: 'pegasus-token',
+      });
+
+      assert.equal(scope.destinationCount, 2);
+      assert.ok(scope.warnings.includes('hydrated process details'));
+      assert.equal(scope.processHydration?.inputProcessRefCount, 2);
+      assert.equal(scope.triggerDiagnostics.processItemTypesSeen.find((entry) => entry.type === 'array')?.count, 2);
+      assert.ok(scope.triggerDiagnostics.processArrayItemShapes.length >= 1);
       assert.equal(containsFullPhoneNumber(scope.triggerDiagnostics), false);
       assert.ok(!JSON.stringify(scope).includes('process-1'));
     } finally {

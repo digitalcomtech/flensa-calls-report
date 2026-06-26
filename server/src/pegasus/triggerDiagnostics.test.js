@@ -112,6 +112,29 @@ describe('buildTriggerDiagnostics', () => {
     assert.ok(!JSON.stringify(diagnostics).includes('+525512345678'));
   });
 
+  it('reports array-shaped process item diagnostics without leaking values', () => {
+    const diagnostics = buildTriggerDiagnostics([
+      {
+        id: 't1',
+        processes: [
+          ['process-secret-id', 'twilio/call', { destinations: ['+525512345678'], token: 'secret-token' }],
+        ],
+      },
+    ]);
+
+    assert.ok(
+      diagnostics.processItemTypesSeen.some((entry) => entry.type === 'array' && entry.count > 0)
+    );
+    assert.ok(diagnostics.processArrayItemShapes.length >= 1);
+    assert.ok(diagnostics.processArrayNestedObjectKeysSeen.length >= 1);
+    assert.ok(diagnostics.processArrayStringClassifications.length >= 1);
+    assert.ok(diagnostics.processTopLevelKeysSeen.includes('type'));
+    assert.equal(containsFullPhoneNumber(diagnostics), false);
+    assert.ok(!JSON.stringify(diagnostics).includes('process-secret-id'));
+    assert.ok(!JSON.stringify(diagnostics).includes('+525512345678'));
+    assert.ok(!JSON.stringify(diagnostics).includes('secret-token'));
+  });
+
   it('reports primitive process item types without leaking process ids', () => {
     const diagnostics = buildTriggerDiagnostics([
       {
@@ -182,6 +205,11 @@ describe('normalizeTriggerDiagnosticsForApi', () => {
     );
     assert.equal(normalized.processRefCount, 0);
     assert.equal(normalized.processObjectCount, 0);
+    assert.deepEqual(normalized.processArrayItemShapes, []);
+    assert.deepEqual(normalized.processArrayNestedObjectKeysSeen, []);
+    assert.deepEqual(normalized.processArrayCandidateTypeIndexes, []);
+    assert.deepEqual(normalized.processArrayCandidatePhoneIndexes, []);
+    assert.deepEqual(normalized.processArrayStringClassifications, []);
   });
 });
 

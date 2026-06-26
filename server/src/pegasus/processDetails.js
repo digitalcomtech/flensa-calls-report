@@ -1,5 +1,10 @@
 import { pegasusGet, PegasusApiError } from './client.js';
-import { PROCESS_TYPE_FIELDS } from './triggers.js';
+import {
+  extractProcessIdFromRef,
+  hasProcessDetailShape,
+  isProcessRef,
+  normalizeProcessItem,
+} from './processArrayShape.js';
 import {
   HYDRATION_BY_ID_CONCURRENCY,
   HYDRATION_CAP,
@@ -26,8 +31,6 @@ const BY_ID_ENDPOINT_CANDIDATES = [
   },
 ];
 
-const PROCESS_DETAIL_ROOTS = ['config', 'params', 'settings', 'data', 'payload'];
-
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -40,17 +43,13 @@ function normalizeId(value) {
   return id || null;
 }
 
-export function extractProcessIdFromRef(ref) {
-  if (typeof ref === 'string' || typeof ref === 'number') {
-    return normalizeId(ref);
-  }
-
-  if (!isPlainObject(ref)) {
-    return null;
-  }
-
-  return normalizeId(ref.id ?? ref._id ?? ref.process_id ?? ref.processId);
-}
+export {
+  extractProcessIdFromRef,
+  hasProcessDetailShape,
+  isInspectableProcessObject,
+  isProcessRef,
+  normalizeProcessItem,
+} from './processArrayShape.js';
 
 export function extractProcessIdsFromRefs(refs) {
   const ids = [];
@@ -104,29 +103,15 @@ export function extractProcessRefsFromTriggers(triggers) {
   return refs;
 }
 
-export function hasProcessDetailShape(ref) {
-  if (!isPlainObject(ref)) {
-    return false;
-  }
-
-  if (PROCESS_TYPE_FIELDS.some((field) => typeof ref[field] === 'string' && ref[field].trim())) {
-    return true;
-  }
-
-  for (const root of PROCESS_DETAIL_ROOTS) {
-    const nested = ref[root];
-    if (isPlainObject(nested) && Object.keys(nested).length > 0) {
-      return true;
-    }
-    if (Array.isArray(nested) && nested.length > 0) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 export function isShallowProcess(ref) {
+  if (Array.isArray(ref)) {
+    const converted = normalizeProcessItem(ref);
+    if (converted && hasProcessDetailShape(converted)) {
+      return false;
+    }
+    return Boolean(extractProcessIdFromRef(ref));
+  }
+
   if (typeof ref === 'string' || typeof ref === 'number') {
     return true;
   }
@@ -136,22 +121,6 @@ export function isShallowProcess(ref) {
   }
 
   return !hasProcessDetailShape(ref);
-}
-
-export function isInspectableProcessObject(ref) {
-  return isPlainObject(ref);
-}
-
-export function isProcessRef(ref) {
-  if (typeof ref === 'string' || typeof ref === 'number') {
-    return Boolean(extractProcessIdFromRef(ref));
-  }
-
-  if (!isPlainObject(ref)) {
-    return false;
-  }
-
-  return Boolean(extractProcessIdFromRef(ref)) && isShallowProcess(ref);
 }
 
 export function shouldHydrateProcessDetails(triggers, extracted) {
@@ -380,6 +349,10 @@ export function mergeHydratedProcessesIntoTriggers(triggers, hydratedProcesses) 
     const id = extractProcessIdFromRef(item);
     if (id && hydratedById.has(id)) {
       return hydratedById.get(id);
+    }
+    const normalized = normalizeProcessItem(item);
+    if (normalized) {
+      return normalized;
     }
     return isPlainObject(item) ? item : null;
   };

@@ -15,6 +15,40 @@ function mapProcessItemTypesSeen(entries) {
   return PROCESS_ITEM_TYPES.map((type) => ({ type, count: counts[type] }));
 }
 
+function mapIndexCountEntries(entries) {
+  return (entries ?? []).map((entry) => ({
+    index: entry.index ?? 0,
+    count: entry.count ?? 0,
+  }));
+}
+
+function mapArrayNestedObjectKeys(entries) {
+  return (entries ?? []).map((entry) => ({
+    index: entry.index ?? 0,
+    keys: [...(entry.keys ?? [])],
+  }));
+}
+
+function mapArrayItemShapes(shapes) {
+  return (shapes ?? []).map((shape) => ({
+    length: shape.length ?? 0,
+    count: shape.count ?? 0,
+    itemTypes: [...(shape.itemTypes ?? [])],
+    objectIndexes: [...(shape.objectIndexes ?? [])],
+    primitiveIndexes: [...(shape.primitiveIndexes ?? [])],
+  }));
+}
+
+function mapArrayStringClassifications(entries) {
+  return (entries ?? []).map((entry) => ({
+    index: entry.index ?? 0,
+    looksLikeTwilioCount: entry.looksLikeTwilioCount ?? 0,
+    looksLikeCallCount: entry.looksLikeCallCount ?? 0,
+    looksLikePhoneCount: entry.looksLikePhoneCount ?? 0,
+    shortSafeLabelCount: entry.shortSafeLabelCount ?? 0,
+  }));
+}
+
 function mapProcessHydrationForApi(source) {
   if (!source) {
     return null;
@@ -71,6 +105,11 @@ export function normalizeTriggerDiagnosticsForApi(source = {}) {
     processItemTypesSeen: mapProcessItemTypesSeen(source.processItemTypesSeen),
     processRefCount: source.processRefCount ?? 0,
     processObjectCount: source.processObjectCount ?? 0,
+    processArrayItemShapes: mapArrayItemShapes(source.processArrayItemShapes),
+    processArrayNestedObjectKeysSeen: mapArrayNestedObjectKeys(source.processArrayNestedObjectKeysSeen),
+    processArrayCandidateTypeIndexes: mapIndexCountEntries(source.processArrayCandidateTypeIndexes),
+    processArrayCandidatePhoneIndexes: mapIndexCountEntries(source.processArrayCandidatePhoneIndexes),
+    processArrayStringClassifications: mapArrayStringClassifications(source.processArrayStringClassifications),
   };
 }
 
