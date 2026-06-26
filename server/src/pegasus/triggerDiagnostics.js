@@ -1,4 +1,4 @@
-import { containsFullPhoneNumber } from '../reports/scopeDiagnostics.js';
+import { containsFullPhoneNumber, normalizeTriggerDiagnosticsForApi } from '../reports/scopeDiagnostics.js';
 import { collectProcesses, PROCESS_TYPE_FIELDS } from './triggers.js';
 
 const SAMPLE_LIMIT = 25;
@@ -457,7 +457,7 @@ export function buildTriggerDiagnostics(triggersInput, { sampleLimit = SAMPLE_LI
     }
   }
 
-  return {
+  return normalizeTriggerDiagnosticsForApi({
     sampledTriggerCount: sampled.length,
     triggerTopLevelKeysSeen: [...triggerTopLevelKeysSeen].slice(0, TOP_LEVEL_KEY_LIMIT),
     processArrayPaths: PROCESS_ARRAY_PATHS.map((entry) => ({
@@ -480,5 +480,5 @@ export function buildTriggerDiagnostics(triggersInput, { sampleLimit = SAMPLE_LI
     processPrimitiveFieldNamesSeen: [...processPrimitiveFieldNamesSeen].slice(0, VALUE_LIMIT),
     processCandidatePhoneFieldNamesSeen: mapPathCountsToList(processCandidatePhoneFieldCounts),
     processSampleShapes,
-  };
+  });
 }

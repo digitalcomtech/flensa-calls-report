@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { buildTriggerDiagnostics } from './triggerDiagnostics.js';
-import { buildSafeScopeDiagnostics, containsFullPhoneNumber } from '../reports/scopeDiagnostics.js';
+import { buildSafeScopeDiagnostics, containsFullPhoneNumber, normalizeTriggerDiagnosticsForApi } from '../reports/scopeDiagnostics.js';
 
 const SAMPLE_TRIGGERS = Array.from({ length: 30 }, (_, index) => ({
   id: index + 1,
@@ -121,6 +121,23 @@ describe('buildTriggerDiagnostics', () => {
     const diagnostics = buildTriggerDiagnostics(triggers);
     assert.equal(diagnostics.processSampleShapes.length, 5);
     assert.ok(diagnostics.processSampleShapes.every((shape) => Array.isArray(shape.topLevelKeys)));
+  });
+});
+
+describe('normalizeTriggerDiagnosticsForApi', () => {
+  it('defaults process-shape fields to empty arrays when missing', () => {
+    const normalized = normalizeTriggerDiagnosticsForApi({
+      sampledTriggerCount: 2,
+      triggerTopLevelKeysSeen: ['processes'],
+      processArrayPaths: [{ path: 'processes', count: 2 }],
+    });
+
+    assert.deepEqual(normalized.processTopLevelKeysSeen, []);
+    assert.deepEqual(normalized.processNestedObjectPathsSeen, []);
+    assert.deepEqual(normalized.processNestedArrayPathsSeen, []);
+    assert.deepEqual(normalized.processPrimitiveFieldNamesSeen, []);
+    assert.deepEqual(normalized.processCandidatePhoneFieldNamesSeen, []);
+    assert.deepEqual(normalized.processSampleShapes, []);
   });
 });
 

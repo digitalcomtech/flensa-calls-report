@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import http from 'http';
-import { after, before, describe, it } from 'node:test';
+import { after, before, describe, it, mock } from 'node:test';
 import { createApp } from '../index.js';
 import { containsFullPhoneNumber } from '../reports/scopeDiagnostics.js';
 
@@ -108,6 +108,12 @@ describe('/api/report/scope diagnostics gate', () => {
       assert.ok(!('triggerDiagnostics' in compactBody));
       assert.ok('triggerDiagnostics' in detailedBody);
       assert.equal(containsFullPhoneNumber(detailedBody.triggerDiagnostics), false);
+      assert.ok(Array.isArray(detailedBody.triggerDiagnostics.processTopLevelKeysSeen));
+      assert.ok(Array.isArray(detailedBody.triggerDiagnostics.processNestedObjectPathsSeen));
+      assert.ok(Array.isArray(detailedBody.triggerDiagnostics.processNestedArrayPathsSeen));
+      assert.ok(Array.isArray(detailedBody.triggerDiagnostics.processPrimitiveFieldNamesSeen));
+      assert.ok(Array.isArray(detailedBody.triggerDiagnostics.processCandidatePhoneFieldNamesSeen));
+      assert.ok(Array.isArray(detailedBody.triggerDiagnostics.processSampleShapes));
       assert.ok(!('triggerHydration' in compactBody));
     } finally {
       process.env.ENABLE_SCOPE_DIAGNOSTICS = previous;
@@ -171,6 +177,126 @@ describe('/api/report/scope diagnostics gate', () => {
     } finally {
       process.env.ENABLE_SCOPE_DIAGNOSTICS = previous;
     }
+  });
+});
+
+describe('GET /api/report/scope process-shape trigger diagnostics', () => {
+  let server;
+  let baseUrl;
+  let sessionCookie;
+  let fetchMock;
+
+  before(async () => {
+    process.env.NODE_ENV = 'test';
+    process.env.USE_MOCK_REPORT = 'true';
+    process.env.ALLOW_DEV_SESSION = 'false';
+    process.env.ENABLE_SCOPE_DIAGNOSTICS = 'true';
+    process.env.PEGASUS_API_URL = 'https://api.pegasusgateway.com';
+
+    const originalFetch = global.fetch.bind(global);
+    fetchMock = mock.method(global, 'fetch', async (url, options = {}) => {
+      const target = String(url);
+
+      if (!target.includes('api.pegasusgateway.com')) {
+        return originalFetch(url, options);
+      }
+
+      if (target.endsWith('/login')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => 'application/json' },
+          json: async () => ({ id: 'user-1', name: 'Iframe User' }),
+        };
+      }
+
+      if (target.endsWith('/user/resources')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => 'application/json' },
+          json: async () => ({
+            triggers: [{ id: 'trigger-1' }],
+          }),
+        };
+      }
+
+      if (target.includes('/triggers?') && !target.includes('/api/triggers')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => 'application/json' },
+          json: async () => ({
+            data: [
+              {
+                id: 'trigger-1',
+                processes: [
+                  {
+                    command: 'twilio/call',
+                    config: {
+                      args: { to: '+525511111111' },
+                      parameters: { mode: 'voice' },
+                    },
+                    params: { retry: 1 },
+                    data: { channel: 'sms' },
+                  },
+                ],
+              },
+            ],
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected Pegasus fetch: ${target}`);
+    });
+
+    const app = createApp();
+    await new Promise((resolve) => {
+      server = app.listen(0, '127.0.0.1', resolve);
+    });
+    const { port } = server.address();
+    baseUrl = `http://127.0.0.1:${port}`;
+
+    const authRes = await fetch(`${baseUrl}/api/auth/iframe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'pegasus-token' }),
+    });
+    sessionCookie = parseSetCookie(authRes.headers.getSetCookie?.() ?? authRes.headers.get('set-cookie'));
+  });
+
+  after(async () => {
+    fetchMock.mock.restore();
+    await new Promise((resolve) => server.close(resolve));
+  });
+
+  it('returns process-shape trigger diagnostics for hydrated triggers', async () => {
+    const response = await fetch(`${baseUrl}/api/report/scope?includeTriggerDiagnostics=true`, {
+      headers: { Cookie: sessionCookie },
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.ok('triggerDiagnostics' in body);
+
+    const triggerDiagnostics = body.triggerDiagnostics;
+    assert.ok(Array.isArray(triggerDiagnostics.processTopLevelKeysSeen));
+    assert.ok(Array.isArray(triggerDiagnostics.processNestedObjectPathsSeen));
+    assert.ok(Array.isArray(triggerDiagnostics.processNestedArrayPathsSeen));
+    assert.ok(Array.isArray(triggerDiagnostics.processPrimitiveFieldNamesSeen));
+    assert.ok(Array.isArray(triggerDiagnostics.processCandidatePhoneFieldNamesSeen));
+    assert.ok(Array.isArray(triggerDiagnostics.processSampleShapes));
+
+    assert.ok(triggerDiagnostics.processTopLevelKeysSeen.includes('command'));
+    assert.ok(triggerDiagnostics.processTopLevelKeysSeen.includes('config'));
+    assert.ok(
+      triggerDiagnostics.processNestedObjectPathsSeen.some((entry) => entry.path === 'config' && entry.count > 0)
+    );
+    assert.ok(triggerDiagnostics.processPrimitiveFieldNamesSeen.includes('params.retry'));
+    assert.ok(triggerDiagnostics.processSampleShapes.length >= 1);
+    assert.ok(triggerDiagnostics.processSampleShapes[0].topLevelKeys.includes('config'));
+    assert.equal(containsFullPhoneNumber(triggerDiagnostics), false);
+    assert.ok(!JSON.stringify(triggerDiagnostics).includes('+525511111111'));
   });
 });
 

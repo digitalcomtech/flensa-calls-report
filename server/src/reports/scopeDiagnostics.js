@@ -2,6 +2,43 @@ import { maskDestinations } from '../utils/phoneMask.js';
 
 const FULL_PHONE_PATTERN = /\+?\d{7,}/;
 
+const SAMPLE_NESTED_OBJECT_ROOT_KEYS = ['config', 'params', 'settings', 'data', 'payload'];
+
+function mapPathCountEntries(entries) {
+  return (entries ?? []).map((entry) => ({
+    path: entry.path,
+    count: entry.count ?? 0,
+  }));
+}
+
+function mapProcessSampleShapes(shapes) {
+  return (shapes ?? []).map((shape) => ({
+    topLevelKeys: [...(shape.topLevelKeys ?? [])],
+    nestedObjectKeys: Object.fromEntries(
+      SAMPLE_NESTED_OBJECT_ROOT_KEYS.map((key) => [key, [...(shape.nestedObjectKeys?.[key] ?? [])]])
+    ),
+  }));
+}
+
+/** Stable API shape for trigger diagnostics; never emits null for array fields. */
+export function normalizeTriggerDiagnosticsForApi(source = {}) {
+  return {
+    sampledTriggerCount: source.sampledTriggerCount ?? 0,
+    triggerTopLevelKeysSeen: [...(source.triggerTopLevelKeysSeen ?? [])],
+    processArrayPaths: mapPathCountEntries(source.processArrayPaths),
+    processObjectPaths: mapPathCountEntries(source.processObjectPaths),
+    processTypeFieldsSeen: [...(source.processTypeFieldsSeen ?? [])],
+    processTypeValuesSeen: [...(source.processTypeValuesSeen ?? [])],
+    destinationFieldPathsSeen: mapPathCountEntries(source.destinationFieldPathsSeen),
+    processTopLevelKeysSeen: [...(source.processTopLevelKeysSeen ?? [])],
+    processNestedObjectPathsSeen: mapPathCountEntries(source.processNestedObjectPathsSeen),
+    processNestedArrayPathsSeen: mapPathCountEntries(source.processNestedArrayPathsSeen),
+    processPrimitiveFieldNamesSeen: [...(source.processPrimitiveFieldNamesSeen ?? [])],
+    processCandidatePhoneFieldNamesSeen: mapPathCountEntries(source.processCandidatePhoneFieldNamesSeen),
+    processSampleShapes: mapProcessSampleShapes(source.processSampleShapes),
+  };
+}
+
 export function buildSafeScopeDiagnostics(
   scope,
   { mode, authMode, hasSession, includeResourceShape = false, includeTriggerDiagnostics = false } = {}
@@ -46,47 +83,8 @@ export function buildSafeScopeDiagnostics(
     };
   }
 
-  if (includeTriggerDiagnostics && scope.triggerDiagnostics) {
-    diagnostics.triggerDiagnostics = {
-      sampledTriggerCount: scope.triggerDiagnostics.sampledTriggerCount ?? 0,
-      triggerTopLevelKeysSeen: [...(scope.triggerDiagnostics.triggerTopLevelKeysSeen ?? [])],
-      processArrayPaths: (scope.triggerDiagnostics.processArrayPaths ?? []).map((entry) => ({
-        path: entry.path,
-        count: entry.count,
-      })),
-      processObjectPaths: (scope.triggerDiagnostics.processObjectPaths ?? []).map((entry) => ({
-        path: entry.path,
-        count: entry.count,
-      })),
-      processTypeFieldsSeen: [...(scope.triggerDiagnostics.processTypeFieldsSeen ?? [])],
-      processTypeValuesSeen: [...(scope.triggerDiagnostics.processTypeValuesSeen ?? [])],
-      destinationFieldPathsSeen: (scope.triggerDiagnostics.destinationFieldPathsSeen ?? []).map((entry) => ({
-        path: entry.path,
-        count: entry.count,
-      })),
-      processTopLevelKeysSeen: [...(scope.triggerDiagnostics.processTopLevelKeysSeen ?? [])],
-      processNestedObjectPathsSeen: (scope.triggerDiagnostics.processNestedObjectPathsSeen ?? []).map((entry) => ({
-        path: entry.path,
-        count: entry.count,
-      })),
-      processNestedArrayPathsSeen: (scope.triggerDiagnostics.processNestedArrayPathsSeen ?? []).map((entry) => ({
-        path: entry.path,
-        count: entry.count,
-      })),
-      processPrimitiveFieldNamesSeen: [...(scope.triggerDiagnostics.processPrimitiveFieldNamesSeen ?? [])],
-      processCandidatePhoneFieldNamesSeen: (
-        scope.triggerDiagnostics.processCandidatePhoneFieldNamesSeen ?? []
-      ).map((entry) => ({
-        path: entry.path,
-        count: entry.count,
-      })),
-      processSampleShapes: (scope.triggerDiagnostics.processSampleShapes ?? []).map((shape) => ({
-        topLevelKeys: [...(shape.topLevelKeys ?? [])],
-        nestedObjectKeys: Object.fromEntries(
-          Object.entries(shape.nestedObjectKeys ?? {}).map(([key, nestedKeys]) => [key, [...nestedKeys]])
-        ),
-      })),
-    };
+  if (includeTriggerDiagnostics) {
+    diagnostics.triggerDiagnostics = normalizeTriggerDiagnosticsForApi(scope.triggerDiagnostics ?? {});
 
     if (scope.triggerHydration) {
       diagnostics.triggerHydration = {
