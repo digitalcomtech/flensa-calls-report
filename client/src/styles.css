@@ -96,7 +96,17 @@ body {
 .config-form {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+}
+
+.config-field-dates {
+  width: 100%;
+}
+
+.date-range-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
 }
 
 .config-fields {
@@ -134,23 +144,6 @@ body {
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   font-size: 0.9rem;
-}
-
-.time-range-select:disabled {
-  background: #f8fafc;
-  color: #475569;
-  cursor: not-allowed;
-}
-
-.field-hint {
-  color: #64748b;
-  font-size: 0.78rem;
-  line-height: 1.4;
-}
-
-.config-actions {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .button-primary {
@@ -293,21 +286,6 @@ button:disabled {
   color: #475569;
   font-size: 0.9rem;
   margin: 0.35rem 0 0;
-}
-
-.phase-warning {
-  background: #fff7ed;
-  border: 1px solid #fdba74;
-  border-radius: 8px;
-  margin-bottom: 1.25rem;
-  padding: 0.85rem 1rem;
-}
-
-.phase-warning p {
-  color: #9a3412;
-  font-size: 0.88rem;
-  line-height: 1.45;
-  margin: 0;
 }
 
 .report-section-head {
@@ -521,7 +499,6 @@ th {
   .report-tabs,
   .report-toolbar,
   .table-toolbar,
-  .phase-warning,
   .error {
     display: none !important;
   }

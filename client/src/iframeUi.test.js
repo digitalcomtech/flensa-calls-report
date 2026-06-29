@@ -34,8 +34,7 @@ describe('iframe UI shell', () => {
     );
 
     assert.match(configPanelSource, /REPORT_TITLE/);
-    assert.match(configPanelSource, /REPORT_PAGE_SUBTITLE/);
+    assert.doesNotMatch(configPanelSource, /REPORT_PAGE_SUBTITLE/);
     assert.match(reportConfigSource, /Llamadas/);
-    assert.match(reportConfigSource, /Muestra las llamadas realizadas por el proveedor/);
   });
 });

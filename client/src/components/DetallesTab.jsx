@@ -7,7 +7,6 @@ import {
   PAGE_SIZE_OPTIONS,
   paginateRows,
 } from '../utils/tablePagination.js';
-import PhaseWarningBanner from './PhaseWarningBanner.jsx';
 import ReportHeader from './ReportHeader.jsx';
 import ReportToolbar from './ReportToolbar.jsx';
 
@@ -59,7 +58,6 @@ export default function DetallesTab({ calls = [], from, to }) {
   return (
     <section className="report-view">
       <ReportHeader from={from} to={to} />
-      <PhaseWarningBanner />
 
       <div className="report-section-head">
         <h3>Detalle de llamadas</h3>

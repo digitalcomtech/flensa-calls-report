@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { formatInteger, formatPercentageWithSymbol, formatSeconds } from '../utils/formatters.js';
 import { averageDurationSeconds, buildSummaryTableRows } from '../utils/reportMetrics.js';
-import PhaseWarningBanner from './PhaseWarningBanner.jsx';
 import ReportHeader from './ReportHeader.jsx';
 import ReportToolbar from './ReportToolbar.jsx';
 
@@ -18,7 +17,6 @@ export default function ResumenTab({ report, from, to }) {
   return (
     <section className="report-view">
       <ReportHeader from={from} to={to} />
-      <PhaseWarningBanner />
 
       <div className="report-section-head">
         <h3>Resumen de llamadas</h3>

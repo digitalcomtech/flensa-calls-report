@@ -6,17 +6,9 @@ import IframeAuthBootstrap from '../components/IframeAuthBootstrap.jsx';
 import ReportTabs from '../components/ReportTabs.jsx';
 import ResumenTab from '../components/ResumenTab.jsx';
 
-function defaultFrom() {
-  return '2026-06-20';
-}
-
-function defaultTo() {
-  return '2026-06-23';
-}
-
 function ReportContent() {
-  const [from, setFrom] = useState(defaultFrom);
-  const [to, setTo] = useState(defaultTo);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [report, setReport] = useState(null);
   const [activeTab, setActiveTab] = useState('resumen');
   const [loading, setLoading] = useState(false);
@@ -24,6 +16,9 @@ function ReportContent() {
 
   async function runReport(e) {
     e?.preventDefault();
+    if (!from || !to) {
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
