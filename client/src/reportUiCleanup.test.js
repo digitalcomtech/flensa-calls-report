@@ -49,6 +49,16 @@ describe('report UI cleanup', () => {
     assert.doesNotMatch(reportConfigSource, /Primera fase: este reporte no relaciona alertas/);
   });
 
+  it('does not show the identity card description paragraph', () => {
+    const identityCardSource = readSource('src/components/ReportIdentityCard.jsx');
+    const reportConfigSource = readSource('src/constants/reportConfig.js');
+
+    assert.doesNotMatch(identityCardSource, /REPORT_DESCRIPTION/);
+    assert.doesNotMatch(identityCardSource, /report-identity-description/);
+    assert.doesNotMatch(reportConfigSource, /REPORT_DESCRIPTION/);
+    assert.doesNotMatch(reportConfigSource, /Reporte simple de llamadas realizadas/);
+  });
+
   it('starts with empty date inputs and disables generate until both dates are set', () => {
     const reportPageSource = readSource('src/pages/ReportPage.jsx');
     const dateRangeFilterSource = readSource('src/components/DateRangeFilter.jsx');

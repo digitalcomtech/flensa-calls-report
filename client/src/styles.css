@@ -59,11 +59,12 @@ body {
 @media (min-width: 768px) {
   .config-panel-body {
     grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.2fr);
-    align-items: start;
+    align-items: center;
   }
 }
 
 .report-identity {
+  align-items: center;
   display: flex;
   gap: 1rem;
 }
@@ -83,13 +84,6 @@ body {
 .report-identity-title {
   color: #1d4ed8;
   font-size: 1.35rem;
-  margin: 0 0 0.5rem;
-}
-
-.report-identity-description {
-  color: #475569;
-  font-size: 0.88rem;
-  line-height: 1.5;
   margin: 0;
 }
 
