@@ -1,3 +1,4 @@
+import { analyticsEvents, trackEvent } from '../analytics/posthogAnalytics.js';
 import { downloadTextFile, summaryTableToCsv, summaryTableToText } from '../utils/reportExport.js';
 
 export default function ReportToolbar({
@@ -28,6 +29,11 @@ export default function ReportToolbar({
         filename: csvFilename ?? `reporte-${from}-${to}.csv`,
         mimeType: 'text/csv;charset=utf-8',
       });
+      trackEvent(analyticsEvents.EXPORT_CSV_CLICKED, {
+        page: activeTab,
+        module: 'calls_report',
+        tab: activeTab,
+      });
       return;
     }
 
@@ -36,6 +42,11 @@ export default function ReportToolbar({
         content: summaryTableToCsv(summary),
         filename: `resumen-llamadas-${from}-${to}.csv`,
         mimeType: 'text/csv;charset=utf-8',
+      });
+      trackEvent(analyticsEvents.EXPORT_CSV_CLICKED, {
+        page: 'resumen',
+        module: 'calls_report',
+        tab: 'resumen',
       });
     }
   }

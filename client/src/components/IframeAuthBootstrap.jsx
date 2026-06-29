@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { bootstrapIframeAuth } from '../auth/iframeAuth.js';
 import { createDevSession } from '../api/authClient.js';
+import { initAnalytics } from '../analytics/posthogAnalytics.js';
 
 export default function IframeAuthBootstrap({ children }) {
   const [authState, setAuthState] = useState({ phase: 'loading', user: null, error: null });
@@ -56,6 +57,14 @@ export default function IframeAuthBootstrap({ children }) {
       cleanup?.();
     };
   }, [isDev]);
+
+  useEffect(() => {
+    if (authState.phase !== 'ready') {
+      return;
+    }
+
+    initAnalytics({ userId: authState.user?.id });
+  }, [authState.phase, authState.user]);
 
   async function submitManualToken(e) {
     e.preventDefault();

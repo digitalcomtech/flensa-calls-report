@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { analyticsEvents, bucketResultCount, trackEvent } from '../analytics/posthogAnalytics.js';
 import { callMatchesSearch, DETALLE_COLUMNS, mapCallToDetailRow } from '../utils/callDetails.js';
 import { detailRowsToCsv, detailRowsToText } from '../utils/reportExport.js';
 import {
@@ -42,6 +43,19 @@ export default function DetallesTab({ calls = [], from, to }) {
     setPage(1);
   }
 
+  function handleSearchKeyDown(event) {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
+    trackEvent(analyticsEvents.SEARCH_SUBMITTED, {
+      page: 'detalles',
+      module: 'calls_report',
+      has_search: Boolean(search.trim()),
+      result_count_bucket: bucketResultCount(filteredCalls.length),
+    });
+  }
+
   function handlePageSizeChange(event) {
     setPageSize(Number(event.target.value));
     setPage(1);
@@ -78,6 +92,7 @@ export default function DetallesTab({ calls = [], from, to }) {
             type="search"
             value={search}
             onChange={handleSearchChange}
+            onKeyDown={handleSearchKeyDown}
             placeholder="Buscar en la tabla…"
           />
         </label>

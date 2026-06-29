@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { analyticsEvents, bucketResultCount, trackEvent } from '../analytics/posthogAnalytics.js';
 import { getCallsReport } from '../api/reportClient.js';
 import ReportConfigPanel from '../components/ReportConfigPanel.jsx';
 import DetallesTab from '../components/DetallesTab.jsx';
@@ -25,6 +26,12 @@ function ReportContent() {
       const data = await getCallsReport({ from, to });
       setReport(data);
       setActiveTab('resumen');
+      trackEvent(analyticsEvents.CALLS_REPORT_LOADED, {
+        page: 'report',
+        module: 'calls_report',
+        date_range: `${from}_${to}`,
+        result_count_bucket: bucketResultCount(data?.calls?.length ?? 0),
+      });
     } catch (err) {
       setError(err.message);
       setReport(null);

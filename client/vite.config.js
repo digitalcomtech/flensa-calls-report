@@ -1,7 +1,24 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+function assertPostHogBuildConfig(env) {
+  if (env.VITE_ENABLE_POSTHOG !== 'true') {
+    return;
+  }
+
+  const key = String(env.VITE_POSTHOG_KEY || '').trim();
+  if (!key.startsWith('phc_')) {
+    const prefix = key ? key.slice(0, 8) : '(missing)';
+    throw new Error(
+      `PostHog analytics misconfigured (build): VITE_POSTHOG_KEY must start with "phc_" (got ${prefix})`
+    );
+  }
+}
+
+export default defineConfig(({ mode }) => {
+  assertPostHogBuildConfig(process.env);
+
+  return {
   plugins: [react()],
   root: 'client',
   server: {
@@ -14,4 +31,5 @@ export default defineConfig({
     outDir: '../dist/client',
     emptyOutDir: true,
   },
+  };
 });
