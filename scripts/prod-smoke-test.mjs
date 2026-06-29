@@ -101,6 +101,17 @@ async function run() {
     assert(bundle.ok, 'built JS bundle is served');
     assert(!bundleSource.includes('Cerrar sesión'), 'built UI does not render logout button text');
     assert(!bundleSource.includes('Pegasus User'), 'built UI does not render session user label');
+    assert(!bundleSource.includes('Sin sesión'), 'built UI does not render session placeholder text');
+    assert(!bundleSource.includes('header-inner'), 'built UI does not ship header chrome markup');
+    assert(!bundleSource.includes('header-actions'), 'built UI does not ship header chrome markup');
+
+    const cssMatch = html.match(/href="(\/assets\/[^"]+\.css)"/);
+    assert(cssMatch, 'frontend HTML references a built CSS bundle');
+    const cssBundle = await fetch(`${BASE}${cssMatch[1]}`);
+    const cssSource = await cssBundle.text();
+    assert(cssBundle.ok, 'built CSS bundle is served');
+    assert(!cssSource.includes('.header {'), 'built CSS does not style internal app header bar');
+    assert(!cssSource.includes('.header-inner'), 'built CSS does not style internal app header bar');
 
     const assetProbe = await fetch(`${BASE}/assets/`);
     assert(assetProbe.status === 200 || assetProbe.status === 404, 'non-API routes do not return API JSON errors');

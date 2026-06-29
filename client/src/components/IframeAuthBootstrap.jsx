@@ -83,7 +83,7 @@ export default function IframeAuthBootstrap({ children }) {
   }
 
   if (authState.phase === 'ready') {
-    return children({ user: authState.user });
+    return children();
   }
 
   if (authState.phase === 'dev_prompt') {
